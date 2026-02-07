@@ -1,0 +1,16 @@
+spring:
+  application:
+    name: ms-discovery
+  cloud:
+    config:
+      enabled: false
+  datasource:
+    url: jdbc:postgresql://localhost:5432/ecommerce
+    username: apis
+    password: apis
+eureka:
+  client:
+    serviceUrl:
+      defaultZone: http://localhost:8761/eureka
+    register-with-eureka: false
+    fetch-registry: false

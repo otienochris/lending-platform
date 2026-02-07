@@ -1,0 +1,20 @@
+spring:
+  application:
+    name: crm
+  cloud:
+    config:
+      enabled: false
+  r2dbc:
+    url: r2dbc:postgresql://localhost:5432
+    name: ecommerce
+    username: apis
+    password: apis
+    pool:
+      enabled: true
+eureka:
+  client:
+    serviceUrl:
+      defaultZone: http://localhost:8761/eureka
+    register-with-eureka: false
+    fetch-registry: false
+
