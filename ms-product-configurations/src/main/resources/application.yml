@@ -1,0 +1,72 @@
+spring:
+  application:
+    name: ms-product-configurations
+  cloud:
+    config:
+      enabled: false
+  r2dbc:
+    url: r2dbc:postgresql://localhost:5432
+    name: ecommerce
+    username: apis
+    password: apis
+    pool:
+      enabled: true
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${AUTH_SERVER_URL:http://localhost:4011}
+          jwk-set-uri: ${spring.security.oauth2.resourceserver.jwt.issuer-uri}/.well-known/jwks.json
+eureka:
+  client:
+    serviceUrl:
+      defaultZone: http://localhost:8761/eureka
+    register-with-eureka: false
+    fetch-registry: false
+logging:
+  file: logs/${spring.application.name}.logs
+  max-size: 10MB
+  max-history: 30
+  pattern:
+    file: "%d{yyyy-MM-dd HH:mm:ss.SSS} | severity=%5p | application=${spring.application.name} | thread=%15.15t | %m%n"
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} | severity=%5p | application=${spring.application.name} | thread=%15.15t | %m%n"
+
+
+
+app:
+  service-properties:
+    product-configuration:
+      securityConfigSpec:
+        whitelistedPaths:
+
+          - "/api/v1/auth/**"
+          - "/api/v1/public/**"
+          - "/actuator/health"
+          - "/actuator/info"
+          - "/v3/api-docs/**"
+          - "/swagger-ui.html"
+          - "/swagger-ui/**"
+          - "/webjars/**"
+          - "/oauth/token"
+          - "/api/v1/users"
+        corsConfigs:
+          - mapping: "/**"
+            allowed-origins:
+              - http://localhost:3000
+              - http://localhost:8080
+            allowed-methods:
+              - GET
+              - POST
+              - OPTION
+              - DELETE
+              - PUT
+            allowed-headers:
+              - "*"
+            allow-credentials: true
+        jwtSpec:
+          resourceId: product-configurations
+          principalAttribute: preferred_username
+          issuerUri: ${AUTH_SERVER_URL:http://localhost:4011}
+          jwkSetUri: ${spring.security.oauth2.resourceserver.jwt.issuer-uri}/.well-known/jwks.json
+  product-configurations:
+    version: 1.0.0

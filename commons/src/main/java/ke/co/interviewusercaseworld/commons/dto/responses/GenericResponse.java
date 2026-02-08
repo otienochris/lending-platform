@@ -9,7 +9,7 @@ import lombok.NoArgsConstructor;
 @Builder
 @AllArgsConstructor
 @NoArgsConstructor
-public class GenericResponse<B,H> {
+public class GenericResponse<H,B> {
     private B body;
     private H header;
 }

@@ -1,12 +1,12 @@
 spring:
   application:
-    name: crm
+    name: ms-scheduler
   cloud:
     config:
       enabled: false
   r2dbc:
     url: r2dbc:postgresql://localhost:5432
-    name: crm
+    name: lending_platform
     username: apis
     password: apis
     pool:
@@ -17,4 +17,3 @@ eureka:
       defaultZone: http://localhost:8761/eureka
     register-with-eureka: false
     fetch-registry: false
-

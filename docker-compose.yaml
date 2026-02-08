@@ -1,0 +1,136 @@
+version: '3.8'
+services:
+  postgresql:
+    image: postgres:18-alpine
+    command: -c 'max_connections=1000'
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    volumes:
+      - ~/apps/postgres:/var/lib/postgresql/data
+    environment:
+      POSTGRES_PASSWORD: apis
+      POSTGRES_USER: apis
+      POSTGRES_MULTIPLE_DATABASES: "products,loans,crm,notification"
+    env_file:
+      - .env
+    networks:
+      - default
+  analytics-service:
+    image: expd/${ANALYTICS_APP_NAME}
+    container_name: ${ANALYTICS_APP_NAME}
+    ports:
+      - ${ANALYTICS_PORT}:${ANALYTICS_PORT}
+    depends_on:
+      - postgresql
+      - service-discovery
+    env_file:
+      - .env
+  authorization-service:
+    image: expd/${AUTHORIZATION_APP_NAME}
+    container_name: ${AUTHORIZATION_APP_NAME}
+    ports:
+      - ${AUTHORIZATION_PORT}:${AUTHORIZATION_PORT}
+    depends_on:
+      - postgresql
+      - service-discovery
+    env_file:
+      - .env
+  cart-management-service:
+    image: expd/cart-management-service
+    container_name: cart-management-service
+    ports:
+      - 4007:4007
+    depends_on:
+      - postgresql
+      - service-discovery
+    env_file:
+      - .env
+  crm-service:
+    image: expd/${CRM_APP_NAME}
+    container_name: ${CRM_APP_NAME}
+    ports:
+      - ${CRM_PORT}:${CRM_PORT}
+    depends_on:
+      - postgresql
+      - service-discovery
+      - authorization-service
+    env_file:
+      - .env
+  gateway-service:
+    image: expd/${GATEWAY_APP_NAME}
+    container_name: ${GATEWAY_APP_NAME}
+    ports:
+      - ${GATEWAY_PORT}:${GATEWAY_PORT}
+    env_file:
+      - .env
+    depends_on:
+      - service-discovery
+  inventory-service:
+    image: expd/${INVENTORY_DOCKER_IMAGE_NAME}
+    container_name: ${INVENTORY_APP_NAME}
+    ports:
+      - ${INVENTORY_PORT}:${INVENTORY_PORT}
+    depends_on:
+      - postgresql
+      - service-discovery
+    env_file:
+      - .env
+  notification-service:
+    image: expd/${NOTIFICATION_APP_NAME}
+    container_name: ${NOTIFICATION_APP_NAME}
+    ports:
+      - ${NOTIFICATION_PORT}:${NOTIFICATION_PORT}
+    depends_on:
+      - postgresql
+      - service-discovery
+    env_file:
+      - .env
+  order-management-service:
+    image: expd/${ORDER_MANAGEMENT_APP_NAME}
+    container_name: ${ORDER_MANAGEMENT_APP_NAME}
+    ports:
+      - ${ORDER_MANAGEMENT_PORT}:${ORDER_MANAGEMENT_PORT}
+    depends_on:
+      - postgresql
+      - service-discovery
+    env_file:
+      - .env
+  payment-service:
+    image: expd/${PAYMENT_APP_NAME}
+    container_name: ${PAYMENT_APP_NAME}
+    ports:
+      - ${PAYMENT_PORT}:${PAYMENT_PORT}
+    depends_on:
+      - postgresql
+      - service-discovery
+    env_file:
+      - .env
+  service-discovery:
+    image: expd/${EUREKA_APP_NAME}
+    container_name: service-discovery
+    ports:
+      - ${EUREKA_PORT}:${EUREKA_PORT}
+    env_file:
+      - .env
+  shipping-service:
+    image: expd/${SHIPPING_APP_NAME}
+    container_name: ${SHIPPING_APP_NAME}
+    ports:
+      - ${SHIPPING_PORT}:${SHIPPING_PORT}
+    depends_on:
+      - postgresql
+      - service-discovery
+    env_file:
+      - .env
+  pgadmin:
+    image: dpage/pgadmin4
+    environment:
+      - PGADMIN_DEFAULT_EMAIL=${PGADMIN_DEFAULT_EMAIL}
+      - PGADMIN_DEFAULT_PASSWORD=${PGADMIN_DEFAULT_PASSWORD}
+    ports:
+      - 9000:80
+networks:
+  default:
+
+
