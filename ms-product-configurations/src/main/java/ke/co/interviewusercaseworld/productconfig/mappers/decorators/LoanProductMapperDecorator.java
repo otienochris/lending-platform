@@ -28,7 +28,10 @@ public class LoanProductMapperDecorator implements LoanProductMapper {
     @Override
     public LoanProductCreationResponseDto toDto(LoanProduct loanProduct) {
         LoanProductCreationResponseDto dto = loanProductMapper.toDto(loanProduct);
-        dto.setTenureOptions(Arrays.stream(loanProduct.getTenureOptions().split(",")).toList().stream().map(Integer::valueOf).toList());
+        String tenureOptions = loanProduct.getTenureOptions();
+        if (tenureOptions != null){
+            dto.setTenureOptions(Arrays.stream(tenureOptions.split(",")).toList().stream().map(Integer::valueOf).toList());
+        }
         return dto;
     }
 

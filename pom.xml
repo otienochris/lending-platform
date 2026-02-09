@@ -25,6 +25,7 @@
 		<module>ms-gateway</module>
 		<module>ms-scheduler</module>
 		<module>ms-orchestrator</module>
+		<module>auth-server</module>
 	</modules>
 	<url/>
 	<licenses>

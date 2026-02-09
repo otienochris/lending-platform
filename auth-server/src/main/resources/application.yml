@@ -1,0 +1,77 @@
+server:
+  port: ${AUTH_PORT}
+spring:
+  application:
+    name: ${AUTH_APP_NAME}
+  r2dbc:
+    url: r2dbc:postgresql://localhost:5432
+    name: lending_platform
+    username: apis
+    password: apis
+    pool:
+      enabled: true
+      max-size: 100
+      initial-size: 5
+      max-idle-time: 30m
+      #Set Database Connection Request Timeout to 60secs and maximum connections to 500
+      connection-timeout: 60000
+      maximum-pool-size: 100
+  server:
+    port: ${AUTH_PORT}
+    servlet:
+      context-path: ${AUTH_CONTEXT_PATH}
+  logging:
+    pattern:
+      file: "%d{yyyy-MM-dd HH:mm:ss.SSS} | severity=%5p | application=${spring.application.name} | thread=%15.15t | %m%n"
+      console: "%d{yyyy-MM-dd HH:mm:ss.SSS} | severity=%5p | application=${spring.application.name} | thread=%15.15t | %m%n"
+    file:
+      name: logs/${spring.application.name}.logs
+eureka:
+  client:
+    registerWithEureka: false
+    fetchRegistry: false
+    service-url:
+      defaultZone: ${EUREKA_PATH}
+logging:
+
+  file: logs/${spring.application.name}.logs
+  max-size: 10MB
+  max-history: 30
+  pattern:
+    file: "%d{yyyy-MM-dd HH:mm:ss.SSS} | severity=%5p | application=${spring.application.name} | thread=%15.15t | %m%n"
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} | severity=%5p | application=${spring.application.name} | thread=%15.15t | %m%n"
+app:
+  securityConfigSpec:
+    whitelistedPaths:
+      - "/.well-known/jwks.json"
+      - "/.well-known/openid-configuration"
+      - "/api/v1/auth/**"
+      - "/api/v1/public/**"
+      - "/actuator/health"
+      - "/actuator/info"
+      - "/v3/api-docs/**"
+      - "/swagger-ui.html"
+      - "/swagger-ui/**"
+      - "/webjars/**"
+      - "/oauth/token"
+      - "/api/v1/users"
+
+    jwtSpec:
+      secret: ${JWT_SECRET}
+      expiration: ${JWT_EXPIRATION}
+      refreshExpiration: ${JWT_REFRESH_EXPIRATION}
+      issuer: ${JWT_ISSUER}
+    password-spec:
+      passwordLength: 12
+auth:
+  security:
+    password-encoder:
+      strength: ${PASSWORD_STRENGTH}
+    cors:
+      allowed-origins: "http://localhost:3000,http://localhost:8080"
+      allowed-methods: "*"
+      allowed-headers: "*"
+      allow-credentials: true
+    rate-limit:
+      login-attempts: 5
+      lock-time-minutes: 30

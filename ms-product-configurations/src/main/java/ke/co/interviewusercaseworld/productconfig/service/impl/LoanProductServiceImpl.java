@@ -21,7 +21,7 @@ import reactor.core.publisher.Mono;
 import java.util.Map;
 import java.util.UUID;
 
-import static ke.co.interviewusercaseworld.commons.enums.ResponseCodesEnum.*;
+import static ke.co.interviewusercaseworld.commons.enums.ResponseCodes.*;
 import static ke.co.interviewusercaseworld.commons.utils.Helpers.getDefaultRequestHeaderObject;
 
 @Service
@@ -36,38 +36,61 @@ public class LoanProductServiceImpl implements LoanProductService {
         String requestRefId = request.getHeader().getRequestRefId();
         Helpers.log(requestRefId, LogLevelEnum.info, OperationNameEnum.PRODUCT_CREATION, "Creating new loan product", null);
         LoanProduct entity = loanProductMapper.toEntity(request.getBody());
-        return loanProductRepository.save(entity)
-                .switchIfEmpty(Mono.just(LoanProduct.builder().build()))
-                .onErrorResume(e -> {
-                    Helpers.log(requestRefId, LogLevelEnum.error, OperationNameEnum.PRODUCT_CREATION, "Error creating product", new RuntimeException(e));
-                    return Mono.just(LoanProduct.builder().build());
-                })
-                .map(loanProductMapper::toDto)
-                .map(loanProductCreationResponseDto -> {
-                    if (loanProductCreationResponseDto.getId() == null) {
-                        return GenericResponse.<DefaultResponseHeader, LoanProductCreationResponseDto>builder()
-                                .header(DefaultResponseHeader.builder()
+        return loanProductRepository.existsByProductName(request.getBody().getProductName())
+                .defaultIfEmpty(false)
+                .flatMap(exists -> {
+                    if (exists) {
+                        return Mono.just(GenericResponse.<DefaultResponseHeader, LoanProductCreationResponseDto>builder()
+                                        .header(DefaultResponseHeader.builder()
+                                                .responseCode(RC_400)
+                                                .responseRefId(requestRefId)
+                                                .correlationId(request.getHeader().getCorrelationId())
+                                                .sourceSystem(request.getHeader().getSourceSystem())
+                                                .customerMessage("Loan product already exists")
+                                                .debugMessage("Loan product already exists")
+                                                .operation(request.getHeader().getOperation())
+                                                .build())
+                                .build());
+                    }
+                    return loanProductRepository.save(entity)
+                            .switchIfEmpty(Mono.just(LoanProduct.builder().build()))
+                            .onErrorResume(e -> {
+                                e.printStackTrace();
+                                Helpers.log(requestRefId, LogLevelEnum.error, OperationNameEnum.PRODUCT_CREATION, "Error creating product", new RuntimeException(e));
+                                return Mono.just(LoanProduct.builder().build());
+                            })
+                            .map(loanProductMapper::toDto)
+                            .map(loanProductCreationResponseDto -> {
+                                if (loanProductCreationResponseDto.getId() == null) {
+                                    return GenericResponse.<DefaultResponseHeader, LoanProductCreationResponseDto>builder()
+                                            .header(DefaultResponseHeader.builder()
+                                                    .responseRefId(requestRefId)
+                                                    .responseCode(RC_500)
+                                                    .operation(request.getHeader().getOperation())
+                                                    .correlationId(request.getHeader().getCorrelationId())
+                                                    .sourceSystem(request.getHeader().getSourceSystem())
+                                                    .customerMessage("Error creating loan product")
+                                                    .debugMessage("Loan product could not be created")
+                                                    .build())
+                                            .build();
+                                }
+                                Helpers.log(requestRefId, LogLevelEnum.info, OperationNameEnum.PRODUCT_CREATION, "Loan product created successfully", null);
+                                DefaultResponseHeader header = DefaultResponseHeader.builder()
+                                        .responseCode(RC_200)
                                         .responseRefId(requestRefId)
-                                        .responseCode(RC_500)
                                         .correlationId(request.getHeader().getCorrelationId())
                                         .sourceSystem(request.getHeader().getSourceSystem())
-                                        .customerMessage("Error creating loan product")
-                                        .debugMessage("Loan product could not be created")
-                                        .build())
-                                .build();
-                    }
-                    Helpers.log(requestRefId, LogLevelEnum.info, OperationNameEnum.PRODUCT_CREATION, "Loan product created successfully", null);
-                    DefaultResponseHeader header = DefaultResponseHeader.builder()
-                            .responseCode(RC_200)
-                            .responseRefId(requestRefId)
-                            .correlationId(request.getHeader().getCorrelationId())
-                            .sourceSystem(request.getHeader().getSourceSystem())
-                            .build();
-                    return GenericResponse.<DefaultResponseHeader, LoanProductCreationResponseDto>builder()
-                            .header(header)
-                            .body(loanProductCreationResponseDto)
-                            .build();
+                                        .operation(request.getHeader().getOperation())
+                                        .customerMessage("Loan product created successfully")
+                                        .debugMessage("Loan product created successfully")
+                                        .build();
+                                return GenericResponse.<DefaultResponseHeader, LoanProductCreationResponseDto>builder()
+                                        .header(header)
+                                        .body(loanProductCreationResponseDto)
+                                        .build();
+                            });
                 });
+
     }
 
     @Override

@@ -4,8 +4,7 @@ import ke.co.interviewusercaseworld.commons.dto.requests.DefaultRequestHeader;
 import ke.co.interviewusercaseworld.commons.dto.requests.GenericRequest;
 import ke.co.interviewusercaseworld.commons.dto.responses.DefaultResponseHeader;
 import ke.co.interviewusercaseworld.commons.dto.responses.GenericResponse;
-import ke.co.interviewusercaseworld.commons.enums.ResponseCodesEnum;
-import ke.co.interviewusercaseworld.commons.utils.Helpers;
+import ke.co.interviewusercaseworld.commons.enums.ResponseCodes;
 import ke.co.interviewusercaseworld.productconfig.model.dto.request.FeeRequestDto;
 import ke.co.interviewusercaseworld.productconfig.model.dto.request.LoanProductCreationRequest;
 import ke.co.interviewusercaseworld.productconfig.model.dto.response.FeeResponseDto;
@@ -23,7 +22,7 @@ import java.util.Map;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/ api/v1/loan-products")
+@RequestMapping("/api/v1/loan-products")
 @RequiredArgsConstructor
 public class LoanProductController {
 
@@ -34,9 +33,10 @@ public class LoanProductController {
     public Mono<ResponseEntity<GenericResponse<DefaultResponseHeader, LoanProductCreationResponseDto>>> create(
             @RequestBody GenericRequest<DefaultRequestHeader, LoanProductCreationRequest> request
     ) {
+
         return productService.createLoanProduct(request)
                 .flatMap(response -> {
-                    if (ResponseCodesEnum.RC_200.equals(response.getHeader().getResponseCode())){
+                    if (ResponseCodes.RC_200.equals(response.getHeader().getResponseCode())){
                         return Mono.just(ResponseEntity.ok(response));
                     } else {
                         return Mono.just(ResponseEntity.badRequest().body(response));
@@ -56,7 +56,7 @@ public class LoanProductController {
     ) {
         return productService.getLoanProduct(productId, headers)
                 .flatMap(response -> {
-                    if (ResponseCodesEnum.RC_200.equals(response.getHeader().getResponseCode())){
+                    if (ResponseCodes.RC_200.equals(response.getHeader().getResponseCode())){
                         return Mono.just(ResponseEntity.ok(response));
                     } else {
                         return Mono.just(ResponseEntity.badRequest().body(response));
@@ -71,7 +71,7 @@ public class LoanProductController {
     ) {
         return productService.updateLoanProduct(productId, request)
                 .flatMap(response -> {
-                    if (ResponseCodesEnum.RC_200.equals(response.getHeader().getResponseCode())){
+                    if (ResponseCodes.RC_200.equals(response.getHeader().getResponseCode())){
                         return Mono.just(ResponseEntity.ok(response));
                     } else {
                         return Mono.just(ResponseEntity.badRequest().body(response));
@@ -84,7 +84,7 @@ public class LoanProductController {
                              @RequestHeader Map<String, String> headers) {
         return productService.deleteLoanProduct(headers, productId)
                 .flatMap(res -> {
-                    if (ResponseCodesEnum.RC_200.equals(res.getHeader().getResponseCode())){
+                    if (ResponseCodes.RC_200.equals(res.getHeader().getResponseCode())){
                         return Mono.just(ResponseEntity.ok(res));
                     }
                     return Mono.just(ResponseEntity.badRequest().body(res));
@@ -100,7 +100,7 @@ public class LoanProductController {
     ) {
         return feeService.addFee(productId, request)
                 .flatMap(response -> {
-                    if (ResponseCodesEnum.RC_200.equals(response.getHeader().getResponseCode())){
+                    if (ResponseCodes.RC_200.equals(response.getHeader().getResponseCode())){
                         return Mono.just(ResponseEntity.ok(response));
                     } else {
                         return Mono.just(ResponseEntity.badRequest().body(response));
@@ -112,7 +112,7 @@ public class LoanProductController {
     public Mono<ResponseEntity<GenericResponse<DefaultResponseHeader, List<FeeResponseDto>>>> getFees(@RequestHeader Map<String, String> headers, @PathVariable UUID productId) {
         return feeService.getFees(productId, headers)
                 .flatMap(response -> {
-                    if (ResponseCodesEnum.RC_200.equals(response.getHeader().getResponseCode())){
+                    if (ResponseCodes.RC_200.equals(response.getHeader().getResponseCode())){
                         return Mono.just(ResponseEntity.ok(response));
                     } else {
                         return Mono.just(ResponseEntity.badRequest().body(response));
@@ -124,7 +124,7 @@ public class LoanProductController {
     public Mono<ResponseEntity<GenericResponse<DefaultResponseHeader, Void>>> deleteFee(@RequestHeader Map<String, String> headers, @PathVariable UUID feeId) {
         return feeService.deleteFee(headers, feeId)
                 .flatMap(response -> {
-                    if (ResponseCodesEnum.RC_200.equals(response.getHeader().getResponseCode())){
+                    if (ResponseCodes.RC_200.equals(response.getHeader().getResponseCode())){
                         return Mono.just(ResponseEntity.ok(response));
                     } else {
                         return Mono.just(ResponseEntity.badRequest().body(response));

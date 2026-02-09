@@ -23,8 +23,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-import static ke.co.interviewusercaseworld.commons.enums.ResponseCodesEnum.RC_200;
-import static ke.co.interviewusercaseworld.commons.enums.ResponseCodesEnum.RC_400;
+import static ke.co.interviewusercaseworld.commons.enums.ResponseCodes.RC_200;
+import static ke.co.interviewusercaseworld.commons.enums.ResponseCodes.RC_400;
 import static ke.co.interviewusercaseworld.commons.utils.Helpers.getDefaultRequestHeaderObject;
 
 @Service

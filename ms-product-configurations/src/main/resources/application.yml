@@ -6,7 +6,7 @@ spring:
       enabled: false
   r2dbc:
     url: r2dbc:postgresql://localhost:5432
-    name: ecommerce
+    name: lending_platform
     username: apis
     password: apis
     pool:
@@ -15,8 +15,21 @@ spring:
     oauth2:
       resourceserver:
         jwt:
-          issuer-uri: ${AUTH_SERVER_URL:http://localhost:4011}
+          #          issuer-uri: ${misc.keycloak.baseurl}/realms/${misc.keycloak.realm}
+          issuer-uri: http://localhost:4011
           jwk-set-uri: ${spring.security.oauth2.resourceserver.jwt.issuer-uri}/.well-known/jwks.json
+      client:
+        registration:
+          keycloak:
+            client-id: product-configurations
+            authorization-grant-type: authorization_code
+            scope:
+              - openid
+        provider:
+          keycloak:
+            issuer-uri: ${spring.security.oauth2.resourceserver.jwt.issuer-uri}
+            user-name-attribute: preferred_username
+
 eureka:
   client:
     serviceUrl:
@@ -24,6 +37,8 @@ eureka:
     register-with-eureka: false
     fetch-registry: false
 logging:
+  level:
+    web: debug
   file: logs/${spring.application.name}.logs
   max-size: 10MB
   max-history: 30
@@ -48,7 +63,6 @@ app:
           - "/swagger-ui/**"
           - "/webjars/**"
           - "/oauth/token"
-          - "/api/v1/users"
         corsConfigs:
           - mapping: "/**"
             allowed-origins:
@@ -66,7 +80,8 @@ app:
         jwtSpec:
           resourceId: product-configurations
           principalAttribute: preferred_username
-          issuerUri: ${AUTH_SERVER_URL:http://localhost:4011}
-          jwkSetUri: ${spring.security.oauth2.resourceserver.jwt.issuer-uri}/.well-known/jwks.json
+#          issuerUri: ${AUTH_SERVER_URL:http://localhost:4011}
+          issuerUri: http://localhost:4011
+          jwkSetUri: ${app.service-properties.product-configuration.securityConfigSpec.jwtSpec.issuerUri}/.well-known/jwks.json
   product-configurations:
     version: 1.0.0
