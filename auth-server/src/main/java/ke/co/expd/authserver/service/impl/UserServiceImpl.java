@@ -2,10 +2,9 @@ package ke.co.expd.authserver.service.impl;
 
 import ke.co.expd.authserver.config.CustomUserPrincipal;
 import ke.co.expd.authserver.exceptions.UserNotFound;
-import ke.co.expd.authserver.model.dto.request.GenericRequest;
+import ke.co.expd.authserver.mappers.UserMapper;
 import ke.co.expd.authserver.model.dto.request.UpdateUserRequest;
 import ke.co.expd.authserver.model.dto.request.UserCreationRequestDto;
-import ke.co.expd.authserver.model.dto.response.GenericResponse;
 import ke.co.expd.authserver.model.dto.response.UserResponseDto;
 import ke.co.expd.authserver.model.entities.Role;
 import ke.co.expd.authserver.model.entities.User;
@@ -16,6 +15,10 @@ import ke.co.expd.authserver.repoisitory.UserRepository;
 import ke.co.expd.authserver.repoisitory.UserRoleRepository;
 import ke.co.expd.authserver.repoisitory.impl.UserRoleCustomRepository;
 import ke.co.expd.authserver.service.UserService;
+import ke.co.interviewusercaseworld.commons.dto.requests.DefaultRequestHeader;
+import ke.co.interviewusercaseworld.commons.dto.requests.GenericRequest;
+import ke.co.interviewusercaseworld.commons.dto.responses.DefaultResponseHeader;
+import ke.co.interviewusercaseworld.commons.dto.responses.GenericResponse;
 import ke.co.interviewusercaseworld.commons.enums.LogLevelEnum;
 import ke.co.interviewusercaseworld.commons.enums.OperationNameEnum;
 import ke.co.interviewusercaseworld.commons.enums.ResponseCodes;
@@ -45,6 +48,7 @@ public class UserServiceImpl implements UserService, ReactiveUserDetailsService 
     private final DummyCacheManage cacheManager;
     private final PasswordEncoder passwordEncoder;
     private final UserRoleCustomRepository userRoleCustomRepository;
+    private final UserMapper userMapper;
 
     private static boolean stringIsPresent(String string) {
         return string != null && !string.isBlank();
@@ -122,16 +126,19 @@ public class UserServiceImpl implements UserService, ReactiveUserDetailsService 
     }
 
     @Override
-    public Mono<GenericResponse<UserResponseDto>> register(GenericRequest<UserCreationRequestDto> request) {
+    public Mono<GenericResponse<DefaultResponseHeader, UserResponseDto>> register(GenericRequest<DefaultRequestHeader, UserCreationRequestDto> request) {
         return userRepository.existsByUsername(request.getBody().getUsername())
                 .flatMap(exists -> {
                     if (exists) {
-                        return Mono.just(GenericResponse.<UserResponseDto>builder()
-                                .header(GenericResponse.Header.builder()
+                        return Mono.just(GenericResponse.<DefaultResponseHeader, UserResponseDto>builder()
+                                .header(DefaultResponseHeader.builder()
+                                        .sourceSystem(request.getHeader().getSourceSystem())
+                                        .correlationId(request.getHeader().getCorrelationId())
+                                        .operation(request.getHeader().getOperation())
                                         .responseRefId(request.getHeader().getRequestRefId())
                                         .customerMessage("Username is already taken")
                                         .debugMessage("Username is already taken")
-                                        .status(ResponseCodes.RC_409.name())
+                                        .responseCode(ResponseCodes.RC_409)
                                         .build())
                                 .build());
                     } else {
@@ -139,12 +146,15 @@ public class UserServiceImpl implements UserService, ReactiveUserDetailsService 
                                 .flatMap(emailExists -> {
 
                                     if (emailExists) {
-                                        return Mono.just(GenericResponse.<UserResponseDto>builder()
-                                                .header(GenericResponse.Header.builder()
+                                        return Mono.just(GenericResponse.<DefaultResponseHeader, UserResponseDto>builder()
+                                                .header(DefaultResponseHeader.builder()
+                                                        .sourceSystem(request.getHeader().getSourceSystem())
+                                                        .correlationId(request.getHeader().getCorrelationId())
+                                                        .operation(request.getHeader().getOperation())
                                                         .responseRefId(request.getHeader().getRequestRefId())
                                                         .customerMessage("Email is already taken")
                                                         .debugMessage("Email is already taken")
-                                                        .status(ResponseCodes.RC_409.name())
+                                                        .responseCode(ResponseCodes.RC_409)
                                                         .build())
                                                 .build());
 
@@ -158,40 +168,52 @@ public class UserServiceImpl implements UserService, ReactiveUserDetailsService 
                                         User user = tuple.getT1();
                                         Role role = tuple.getT2();
                                         if (user.getId() == null) {
-                                            return Mono.just(GenericResponse.<UserResponseDto>builder()
-                                                    .header(GenericResponse.Header.builder()
+                                            return Mono.just(GenericResponse.<DefaultResponseHeader, UserResponseDto>builder()
+                                                    .header(DefaultResponseHeader.builder()
+                                                            .sourceSystem(request.getHeader().getSourceSystem())
+                                                            .correlationId(request.getHeader().getCorrelationId())
+                                                            .operation(request.getHeader().getOperation())
                                                             .responseRefId(request.getHeader().getRequestRefId())
                                                             .customerMessage("User could not be created")
                                                             .debugMessage("User could not be created")
-                                                            .status(ResponseCodes.RC_400.name())
+                                                            .responseCode(ResponseCodes.RC_400)
                                                             .build())
                                                     .build());
                                         }
 
                                         if (role.getId() == null) {
-                                            return Mono.just(GenericResponse.<UserResponseDto>builder()
-                                                    .header(GenericResponse.Header.builder()
+                                            return Mono.just(GenericResponse.<DefaultResponseHeader, UserResponseDto>builder()
+                                                    .header(DefaultResponseHeader.builder()
+                                                            .sourceSystem(request.getHeader().getSourceSystem())
+                                                            .correlationId(request.getHeader().getCorrelationId())
+                                                            .operation(request.getHeader().getOperation())
                                                             .responseRefId(request.getHeader().getRequestRefId())
                                                             .customerMessage("Default role is not present")
                                                             .debugMessage("Create role ROLE_USER first")
-                                                            .status(ResponseCodes.RC_400.name())
+                                                            .responseCode(ResponseCodes.RC_400)
                                                             .build())
                                                     .build());
                                         }
                                         return assignRoleToUser(user.getId(), role.getId(), true)
                                                 .flatMap(v -> {
-                                                    GenericResponse<UserResponseDto> response = GenericResponse.<UserResponseDto>builder().build();
+                                                    GenericResponse<DefaultResponseHeader, UserResponseDto> response = GenericResponse.<DefaultResponseHeader, UserResponseDto>builder().build();
                                                     if (v.equals(true)) {
-                                                        response.setHeader(GenericResponse.Header.builder()
-                                                                        .responseRefId(request.getHeader().getRequestRefId())
-                                                                        .status(ResponseCodes.RC_201.name())
-                                                                        .customerMessage("User created successfully")
-                                                                        .debugMessage("User created successfully")
+                                                        response.setHeader(DefaultResponseHeader.builder()
+                                                                .sourceSystem(request.getHeader().getSourceSystem())
+                                                                .correlationId(request.getHeader().getCorrelationId())
+                                                                .operation(request.getHeader().getOperation())
+                                                                .responseRefId(request.getHeader().getRequestRefId())
+                                                                .responseCode(ResponseCodes.RC_201)
+                                                                .customerMessage("User created successfully")
+                                                                .debugMessage("User created successfully")
                                                                 .build());
                                                     } else {
-                                                        response.setHeader(GenericResponse.Header.builder()
+                                                        response.setHeader(DefaultResponseHeader.builder()
+                                                                .sourceSystem(request.getHeader().getSourceSystem())
+                                                                .correlationId(request.getHeader().getCorrelationId())
+                                                                .operation(request.getHeader().getOperation())
                                                                 .responseRefId(request.getHeader().getRequestRefId())
-                                                                .status(ResponseCodes.RC_200.name())
+                                                                .responseCode(ResponseCodes.RC_200)
                                                                 .customerMessage("User created successfully but role assignment failed")
                                                                 .debugMessage("Use role assignment API to assign role to user")
                                                                 .build());
@@ -207,20 +229,14 @@ public class UserServiceImpl implements UserService, ReactiveUserDetailsService 
 
     private User toUserEntity(UserCreationRequestDto user) {
         String encoded = passwordEncoder.encode(user.getPassword());
-        return User.builder()
-                .password(encoded)
-                .email(user.getEmail())
-                .username(user.getUsername())
-                .lastName(user.getLastName())
-                .firstName(user.getFirstName())
-                .createdAt(LocalDateTime.now())
-                .updatedAt(LocalDateTime.now())
-                .isEmailVerified(false)
-                .isEnabled(false)
-                .isAccountNonExpired(true)
-                .isAccountNonLocked(true)
-                .isCredentialsNonExpired(true)
-                .build();
+        User entity = userMapper.toEntity(user);
+        entity.setPassword(encoded);
+        entity.setEmailVerified(false);
+        entity.setEnabled(false);
+        entity.setAccountNonExpired(true);
+        entity.setAccountNonLocked(true);
+        entity.setCredentialsNonExpired(true);
+        return entity;
     }
 
     private Boolean evictUserCache(UUID userId) {

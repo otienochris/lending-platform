@@ -16,4 +16,5 @@ public class DefaultRequestHeader {
     private OperationNameEnum operation;
     private String requestRefId;
     private String timestamp;
+    private String token;
 }

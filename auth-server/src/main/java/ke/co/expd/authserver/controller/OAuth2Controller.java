@@ -7,10 +7,15 @@ import ke.co.expd.authserver.model.dto.request.LoginRequest;
 import ke.co.expd.authserver.model.dto.request.RefreshTokenRequest;
 import ke.co.expd.authserver.model.dto.response.AuthResponse;
 import ke.co.expd.authserver.model.dto.response.OAuth2TokenResponse;
+import ke.co.expd.authserver.model.dto.response.UserValidationResponse;
 import ke.co.expd.authserver.service.AuthService;
+import ke.co.interviewusercaseworld.commons.dto.requests.DefaultRequestHeader;
+import ke.co.interviewusercaseworld.commons.dto.responses.DefaultResponseHeader;
+import ke.co.interviewusercaseworld.commons.dto.responses.GenericResponse;
 import ke.co.interviewusercaseworld.commons.enums.LogLevelEnum;
 import ke.co.interviewusercaseworld.commons.enums.LoginStrategyEnum;
 import ke.co.interviewusercaseworld.commons.enums.OperationNameEnum;
+import ke.co.interviewusercaseworld.commons.enums.ResponseCodes;
 import ke.co.interviewusercaseworld.commons.utils.Helpers;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
@@ -26,8 +31,10 @@ import reactor.core.publisher.Mono;
 import java.net.URI;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
+import static ke.co.interviewusercaseworld.commons.utils.Helpers.getDefaultRequestHeaderObject;
 import static org.springframework.http.HttpStatus.FOUND;
 import static org.springframework.http.HttpStatus.UNAUTHORIZED;
 
@@ -64,6 +71,31 @@ public class OAuth2Controller {
                     } else {
                         return Mono.just(ResponseEntity.status(UNAUTHORIZED).build());
                     }
+                });
+    }
+
+    @GetMapping("/oauth/users/{userId}/validation")
+    public Mono<ResponseEntity<GenericResponse<DefaultResponseHeader, UserValidationResponse>>> token(@PathVariable UUID userId,
+                                                                                                      @RequestHeader Map<String, String> headers){
+
+        return authService.validateUser(userId, headers)
+                .flatMap(res -> {
+                    if (res.getHeader().getResponseCode().name().startsWith("RC_2")) {
+                        return Mono.just(ResponseEntity.ok(res));
+                    } else {
+                        return Mono.just(ResponseEntity.badRequest().body(res));
+                    }
+                }).onErrorResume(throwable -> {
+                    return Mono.just(ResponseEntity.badRequest().body(GenericResponse.<DefaultResponseHeader, UserValidationResponse>builder()
+                                    .header(DefaultResponseHeader.builder()
+                                            .sourceSystem("USSD")
+                                            .correlationId("")
+                                            .responseCode(ResponseCodes.RC_500)
+                                            .customerMessage("Error occurred while validating user")
+                                            .debugMessage(throwable.getMessage())
+                                            .responseRefId("")
+                                            .build())
+                            .build()));
                 });
     }
 
@@ -138,8 +170,6 @@ public class OAuth2Controller {
     // OpenID Connect Discovery Endpoint
     @GetMapping("/.well-known/openid-configuration")
     public Mono<ResponseEntity<Map<String, Object>>> openIdConfiguration(ServerWebExchange exchange) {
-
-        System.out.println("Issuer: ");
 
         String host = getBaseUrl(exchange.getRequest());
         Map<String, Object> config = new java.util.HashMap<>(Map.of(

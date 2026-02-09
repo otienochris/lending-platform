@@ -43,6 +43,11 @@ public class User {
     @Column("is_enabled")
     private boolean isEnabled = true;
 
+    @Column("is_blacklisted")
+    private boolean isBlacklisted = false;
+
+    private String msisdn; //
+
     @Column("is_email_verified")
     private boolean isEmailVerified = false;
 
@@ -57,13 +62,13 @@ public class User {
 
     //    private boolean isEnabled;
     @Column("is_credentials_non_expired")
-    private boolean isCredentialsNonExpired;
+    private boolean isCredentialsNonExpired = true;
 
     @Column("is_account_non_expired")
-    private boolean isAccountNonExpired;
+    private boolean isAccountNonExpired = true;
 
     @Column("is_account_non_locked")
-    private boolean isAccountNonLocked;
+    private boolean isAccountNonLocked = true;
 
     @Transient
     private Set<Role> roles = new HashSet<>();

@@ -7,8 +7,7 @@ import ke.co.expd.authserver.exceptions.InvalidTokenException;
 import ke.co.expd.authserver.model.dto.request.LoginRequest;
 import ke.co.expd.authserver.model.dto.request.RefreshTokenRequest;
 import ke.co.expd.authserver.model.dto.request.RegisterRequest;
-import ke.co.expd.authserver.model.dto.response.AuthResponse;
-import ke.co.expd.authserver.model.dto.response.UserResponseDto;
+import ke.co.expd.authserver.model.dto.response.*;
 import ke.co.expd.authserver.model.entities.*;
 import ke.co.expd.authserver.repoisitory.RefreshTokenRepository;
 import ke.co.expd.authserver.repoisitory.RoleRepository;
@@ -16,8 +15,12 @@ import ke.co.expd.authserver.repoisitory.UserRepository;
 import ke.co.expd.authserver.repoisitory.UserRoleRepository;
 import ke.co.expd.authserver.service.AuthService;
 import ke.co.expd.authserver.service.RateLimitService;
+import ke.co.interviewusercaseworld.commons.dto.requests.DefaultRequestHeader;
+import ke.co.interviewusercaseworld.commons.dto.responses.DefaultResponseHeader;
+import ke.co.interviewusercaseworld.commons.dto.responses.GenericResponse;
 import ke.co.interviewusercaseworld.commons.enums.LogLevelEnum;
 import ke.co.interviewusercaseworld.commons.enums.OperationNameEnum;
+import ke.co.interviewusercaseworld.commons.enums.ResponseCodes;
 import ke.co.interviewusercaseworld.commons.utils.Helpers;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NonNull;
@@ -28,28 +31,30 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.userdetails.ReactiveUserDetailsService;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.oauth2.jwt.ReactiveJwtDecoder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.Map;
 import java.util.UUID;
 
 import static java.time.LocalDateTime.now;
+import static ke.co.interviewusercaseworld.commons.utils.Helpers.getDefaultRequestHeaderObject;
 
 @Service
 @RequiredArgsConstructor
 public class AuthServiceImpl implements AuthService {
 
-    private final ReactiveUserDetailsService userDetailsService;
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider tokenProvider;
+    private final ReactiveJwtDecoder jwtDecoder;
     private final UserRepository userRepository;
     private final RefreshTokenRepository refreshTokenRepository;
     @Qualifier("customReactiveAuthManager")
     private final ReactiveAuthenticationManager authenticationManager;
-    private final RateLimitService rateLimitService;
     private final RoleRepository roleRepository;
     private final UserRoleRepository userRoleRepository;
 
@@ -223,14 +228,18 @@ public class AuthServiceImpl implements AuthService {
     @Override
     public Mono<RefreshToken> validateRefreshToken(String token) {
         try {
-            Claims claims = tokenProvider.getJwtParser().parseSignedClaims(token).getPayload();
-            if (!"refresh".equals(claims.get("type", String.class))) {
-                return Mono.error(new InvalidTokenException("Not a refresh token"));
-            }
+            return jwtDecoder.decode(token)
+                    .flatMap(jwt -> {
+                        Map<String, Object> claims = jwt.getClaims();
+//                        Claims claims = tokenProvider.getJwtParser().parseSignedClaims(token).getPayload();
+                        if (!"refresh".equals(claims.get("type"))) {
+                            return Mono.error(new InvalidTokenException("Not a refresh token"));
+                        }
 
-            String tokenId = claims.get("token", String.class);
-            return refreshTokenRepository.findByToken(tokenId)
-                    .switchIfEmpty(Mono.error(new InvalidTokenException("Refresh token not found")));
+                        String tokenId = claims.get("token").toString();
+                        return refreshTokenRepository.findByToken(tokenId)
+                                .switchIfEmpty(Mono.error(new InvalidTokenException("Refresh token not found")));
+                    });
         } catch (Exception e) {
             return Mono.error(new InvalidTokenException("Invalid token type: " + e.getMessage()));
         }
@@ -250,5 +259,55 @@ public class AuthServiceImpl implements AuthService {
     @Override
     public Mono<Boolean> validateRequest(String responseType, String clientId, String redirectUri, String scope, String state, ServerWebExchange exchange) {
         return Mono.just(true);
+    }
+
+    @Override
+    public Mono<GenericResponse<DefaultResponseHeader, UserValidationResponse>> validateUser(UUID userId, Map<String, String> headers) {
+        DefaultRequestHeader defaultRequestHeaderObject = getDefaultRequestHeaderObject(headers);
+        Helpers.log(defaultRequestHeaderObject.getRequestRefId(), LogLevelEnum.info, OperationNameEnum.USER_VALIDATION,"Validating user", null);
+        return userRepository.findById(userId)
+                .onErrorResume(throwable -> {
+                    Helpers.log(defaultRequestHeaderObject.getRequestRefId(), LogLevelEnum.info, defaultRequestHeaderObject.getOperation(), "Error getting user", new RuntimeException(throwable));
+                    return Mono.just(User.builder().build());
+                })
+                .defaultIfEmpty(User.builder().build())
+                .flatMap(user -> {
+                    if(user.getId() == null) {
+                        Helpers.log(defaultRequestHeaderObject.getRequestRefId(), LogLevelEnum.info, defaultRequestHeaderObject.getOperation(), "User not found", new RuntimeException("User not found"));
+                        return Mono.just(GenericResponse.<DefaultResponseHeader, UserValidationResponse>builder()
+                                        .header(DefaultResponseHeader.builder()
+                                                .responseRefId(defaultRequestHeaderObject.getRequestRefId())
+                                                .correlationId(defaultRequestHeaderObject.getCorrelationId())
+                                                .sourceSystem(defaultRequestHeaderObject.getSourceSystem())
+                                                .customerMessage("User not found")
+                                                .debugMessage("User not found")
+                                                .responseCode(ResponseCodes.RC_400)
+                                                .build())
+                                .build());
+                    }
+
+
+                    UserValidationResponse response = UserValidationResponse.builder()
+                            .isValid(true)
+                            .isBlacklisted(false) //todo
+                            .isFraudulent(false) // todo
+                            .lastName(user.getLastName())
+                            .msisdn(user.getMsisdn())
+                            .email(user.getEmail())
+                            .build();
+                    Helpers.log(defaultRequestHeaderObject.getRequestRefId(), LogLevelEnum.info, defaultRequestHeaderObject.getOperation(), "User validated successfuly", null);
+                    return Mono.just(GenericResponse.<DefaultResponseHeader, UserValidationResponse>builder()
+                                    .header(DefaultResponseHeader.builder()
+                                            .responseCode(ResponseCodes.RC_200)
+                                            .responseRefId(defaultRequestHeaderObject.getRequestRefId())
+                                            .correlationId(defaultRequestHeaderObject.getCorrelationId())
+                                            .sourceSystem(defaultRequestHeaderObject.getSourceSystem())
+                                            .customerMessage("User validated successfully")
+                                            .debugMessage("User validated successfully")
+                                            .build())
+                                    .body(response)
+                            .build());
+
+                });
     }
 }

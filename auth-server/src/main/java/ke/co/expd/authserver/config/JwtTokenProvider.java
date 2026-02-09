@@ -43,7 +43,6 @@ import static reactor.netty.http.HttpConnectionLiveness.log;
 @Service
 @Getter
 public class JwtTokenProvider {
-    private final JwtParser jwtParser;
     private final SecretKey secretKey;
     private final Duration accessTokenValidity;
     private final Duration refreshTokenValidity;
@@ -69,10 +68,10 @@ public class JwtTokenProvider {
         this.accessTokenValidity = Duration.ofSeconds(securityConfigSpec.getJwtSpec().getExpiration());
         this.refreshTokenValidity = Duration.ofSeconds(securityConfigSpec.getJwtSpec().getRefreshExpiration());
 
-        this.jwtParser = Jwts.parser()
+        /*this.jwtParser = Jwts.parser()
                 .verifyWith(secretKey)
                 .requireIssuer(issuer)
-                .build();
+                .build();*/
     }
 
     public String generateAccessToken(Authentication authentication) {
@@ -115,36 +114,6 @@ public class JwtTokenProvider {
                 .issuer(issuer)
                 .signWith(secretKey)
                 .compact();
-    }
-
-    public Authentication getAuthentication(String token) {
-        Claims claims = jwtParser.parseSignedClaims(token).getPayload();
-        Collection<? extends GrantedAuthority> authorities = extractAuthorities(claims);
-
-        Principal principal = CustomUserPrincipal.builder()
-                .username(claims.getSubject())
-                .email(claims.get("email", String.class))
-                .details((UserResponseDto) claims.get("details"))
-                .build();
-
-        return new UsernamePasswordAuthenticationToken(principal, null, authorities);
-    }
-
-    public boolean validateToken(String token) {
-        try {
-            jwtParser.parseSignedClaims(token);
-            return true;
-        } catch (JwtException | IllegalArgumentException e) {
-            Helpers.log("", LogLevelEnum.ERROR, OperationNameEnum.JWT_AUTHENTICATION, "Invalid JWT token: {}", e);
-            return false;
-        }
-    }
-
-    private Collection<? extends GrantedAuthority> extractAuthorities(Claims claims) {
-        List<String> roles = claims.get("roles", List.class);
-        return roles.stream()
-                .map(SimpleGrantedAuthority::new)
-                .toList();
     }
 
     public Mono<Instant> getAccessTokenValidity(String token) {

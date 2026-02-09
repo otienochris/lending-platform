@@ -72,11 +72,13 @@ public class Helpers {
         String requestRefId = headers.getOrDefault("X-Request-Ref-Id", "");
         String sourceSystem = headers.getOrDefault("X-Source-System", "");
         String operation = headers.getOrDefault("X-Operation", "");
+        String token = headers.getOrDefault("Authorization", "");
         return DefaultRequestHeader.builder()
                 .requestRefId(requestRefId)
                 .correlationId(correlationId)
                 .sourceSystem(sourceSystem)
                 .operation(OperationNameEnum.valueOf(operation))
+                .token(token)
                 .build();
     }
 }

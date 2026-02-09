@@ -1,0 +1,101 @@
+spring:
+  application:
+    name: ms-orchestrator
+  cloud:
+    config:
+      enabled: false
+  r2dbc:
+    url: r2dbc:postgresql://localhost:5432
+    name: lending_platform
+    username: apis
+    password: apis
+    pool:
+      enabled: true
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          #          issuer-uri: ${misc.keycloak.baseurl}/realms/${misc.keycloak.realm}
+          issuer-uri: http://localhost:4011
+          jwk-set-uri: ${spring.security.oauth2.resourceserver.jwt.issuer-uri}/.well-known/jwks.json
+      client:
+        registration:
+          keycloak:
+            client-id: ${sping.application.name}
+            authorization-grant-type: authorization_code
+            scope:
+              - openid
+        provider:
+          keycloak:
+            issuer-uri: ${spring.security.oauth2.resourceserver.jwt.issuer-uri}
+            user-name-attribute: preferred_username
+
+eureka:
+  client:
+    serviceUrl:
+      defaultZone: http://localhost:8761/eureka
+    register-with-eureka: false
+    fetch-registry: false
+logging:
+  file: logs/${spring.application.name}.logs
+  max-size: 10MB
+  max-history: 30
+  pattern:
+    file: "%d{yyyy-MM-dd HH:mm:ss.SSS} | severity=%5p | application=${spring.application.name} | thread=%15.15t | %m%n"
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} | severity=%5p | application=${spring.application.name} | thread=%15.15t | %m%n"
+
+
+
+app:
+  service-properties:
+    product-configuration:
+      securityConfigSpec:
+        whitelistedPaths:
+          - "/actuator/health"
+          - "/actuator/info"
+          - "/v3/api-docs/**"
+          - "/swagger-ui.html"
+          - "/swagger-ui/**"
+          - "/webjars/**"
+        corsConfigs:
+          - mapping: "/**"
+            allowed-origins:
+              - http://localhost:3000
+              - http://localhost:8080
+            allowed-methods:
+              - GET
+              - POST
+              - OPTION
+              - DELETE
+              - PUT
+            allowed-headers:
+              - "*"
+            allow-credentials: true
+        jwtSpec:
+          resourceId: ${spring.application.name}
+          principalAttribute: preferred_username
+          issuerUri: http://localhost:4011
+          jwkSetUri: ${app.service-properties.product-configuration.securityConfigSpec.jwtSpec.issuerUri}/.well-known/jwks.json
+      externalMicroServices:
+        ms-product-configuration:
+          name: ms-product-configuration
+          baseUrl: http://localhost:8081
+          product-valiation-api-spec:
+            url: /product-validation
+            is-protected: true
+            default-headers:
+              content-type: application/json
+              accept: application/json
+
+          auth:
+            url: http://localhost:4011/auth
+            version: 1.0
+            description: ms-product-configuration authentication
+            contextPath: /auth
+            username: apis
+            password: apis
+            auth-type: oauth2
+            default-headers:
+              Content-Type: application/x-www-form-urlencoded
+
+

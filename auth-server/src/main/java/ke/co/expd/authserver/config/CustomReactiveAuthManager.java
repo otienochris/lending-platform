@@ -40,8 +40,6 @@ public class CustomReactiveAuthManager implements ReactiveAuthenticationManager 
                                     .then(Mono.error(new BadCredentialsException("Invalid credentials"))))
                             .flatMap(userDetails -> {
 
-                                System.out.println(userDetails.toString());
-
                                 // Check if user is enabled
                                 if (!userDetails.isEnabled()) {
                                     Helpers.log("", LogLevelEnum.DEBUG, OperationNameEnum.ACCOUNT_STATUS_VALIDATION, "User account is disabled", null);

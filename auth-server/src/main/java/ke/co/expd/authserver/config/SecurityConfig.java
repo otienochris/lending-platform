@@ -3,6 +3,7 @@ package ke.co.expd.authserver.config;
 import ke.co.expd.authserver.filters.JwtAuthenticationFilter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.ReactiveAuthenticationManager;
@@ -10,6 +11,7 @@ import org.springframework.security.config.annotation.method.configuration.Enabl
 import org.springframework.security.config.annotation.web.reactive.EnableWebFluxSecurity;
 import org.springframework.security.config.web.server.SecurityWebFiltersOrder;
 import org.springframework.security.config.web.server.ServerHttpSecurity;
+import org.springframework.security.oauth2.jose.jws.SignatureAlgorithm;
 import org.springframework.security.oauth2.jwt.*;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
@@ -28,16 +30,16 @@ import org.springframework.web.cors.reactive.UrlBasedCorsConfigurationSource;
 @RequiredArgsConstructor
 public class SecurityConfig {
 
-    private final JwtTokenProvider tokenProvider;
     private final ReactiveAuthenticationManager authenticationManager;
     private final ServerAccessDeniedHandler accessDeniedHandler;
     private final AppProperties appProperties;
+    private final ReactiveJwtDecoder jwtDecoder;
+    private final JwtAuthenticationFilter jwtAuthenticationFilter;
 
 
     @Bean
     public SecurityWebFilterChain securityWebFilterChain(ServerHttpSecurity http) {
         String[] whitelistedPaths = appProperties.getSecurityConfigSpec().getWhitelistedPaths();
-        System.out.println(whitelistedPaths);
         return http
                 .csrf(ServerHttpSecurity.CsrfSpec::disable)
                 .formLogin(ServerHttpSecurity.FormLoginSpec::disable)
@@ -55,16 +57,14 @@ public class SecurityConfig {
                 })
                 .oauth2ResourceServer(oauth2ResourceServerSpec -> oauth2ResourceServerSpec
                         .jwt(jwtSpec -> jwtSpec
+                                .jwtDecoder(jwtDecoder)
                                 .jwtAuthenticationConverter(jwtAuthenticationConverter())))
                 .authenticationManager(authenticationManager)
-                .addFilterAfter(jwtAuthenticationFilter(), SecurityWebFiltersOrder.AUTHENTICATION)
+                .addFilterAfter(jwtAuthenticationFilter, SecurityWebFiltersOrder.AUTHENTICATION)
                 .build();
     }
 
-    @Bean
-    public JwtAuthenticationFilter jwtAuthenticationFilter() {
-        return new JwtAuthenticationFilter(tokenProvider);
-    }
+
 
     @Bean
     public ReactiveJwtAuthenticationConverterAdapter jwtAuthenticationConverter() {

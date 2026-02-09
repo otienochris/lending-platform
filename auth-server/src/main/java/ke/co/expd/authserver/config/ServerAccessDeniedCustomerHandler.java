@@ -2,7 +2,9 @@ package ke.co.expd.authserver.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import ke.co.expd.authserver.model.dto.response.AuthResponse;
-import ke.co.expd.authserver.model.dto.response.GenericResponse;
+import ke.co.interviewusercaseworld.commons.dto.responses.DefaultResponseHeader;
+import ke.co.interviewusercaseworld.commons.dto.responses.GenericResponse;
+import ke.co.interviewusercaseworld.commons.enums.ResponseCodes;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.server.reactive.ServerHttpResponse;
@@ -24,10 +26,10 @@ public class ServerAccessDeniedCustomerHandler implements ServerAccessDeniedHand
             response.setStatusCode(HttpStatus.UNAUTHORIZED);
             response.getHeaders().setContentType(MediaType.APPLICATION_JSON);
 
-            GenericResponse<AuthResponse> errorResponse = GenericResponse.<AuthResponse>builder()
-                    .header(GenericResponse.Header.builder()
+            GenericResponse<DefaultResponseHeader, AuthResponse> errorResponse = GenericResponse.<DefaultResponseHeader,AuthResponse>builder()
+                    .header(DefaultResponseHeader.builder()
                             .responseRefId(exchange.getRequest().getHeaders().getFirst("X-Request-Id"))
-                            .status(HttpStatus.UNAUTHORIZED.name())
+                            .responseCode(ResponseCodes.RC_401)
                             .customerMessage("Access Denied: You don't have permission to access this resource")
                             .debugMessage(denied.getMessage())
                             .build())

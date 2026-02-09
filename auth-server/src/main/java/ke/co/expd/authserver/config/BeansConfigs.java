@@ -12,10 +12,8 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.security.oauth2.jwt.JwtEncoder;
-import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
-import org.springframework.security.oauth2.jwt.NimbusReactiveJwtDecoder;
-import org.springframework.security.oauth2.jwt.ReactiveJwtDecoder;
+import org.springframework.security.oauth2.jose.jws.SignatureAlgorithm;
+import org.springframework.security.oauth2.jwt.*;
 import org.springframework.security.oauth2.server.resource.authentication.ReactiveJwtAuthenticationConverter;
 
 import java.security.KeyPair;
@@ -78,10 +76,16 @@ public class BeansConfigs {
 
     @Bean
     public ReactiveJwtDecoder reactiveJwtDecoder(RSAKey rsaKey) throws JOSEException {
-        return NimbusReactiveJwtDecoder
+        String issuerUri = appProperties.getSecurityConfigSpec().getJwtSpec().getIssuer();
+        NimbusReactiveJwtDecoder nimbusReactiveJwtDecoder = NimbusReactiveJwtDecoder
                 .withPublicKey(rsaKey.toRSAPublicKey())
-                .signatureAlgorithm(org.springframework.security.oauth2.jose.jws.SignatureAlgorithm.RS256)
+                .signatureAlgorithm(SignatureAlgorithm.RS256)
                 .build();
-    }
 
+        NimbusReactiveJwtDecoder.withJwkSetUri(issuerUri);
+
+        // Validate issuer
+        nimbusReactiveJwtDecoder.setJwtValidator(JwtValidators.createDefaultWithIssuer(issuerUri));
+        return nimbusReactiveJwtDecoder;
+    }
 }
