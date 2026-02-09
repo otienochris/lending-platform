@@ -1,4 +1,4 @@
-version: '3.8'
+#version: '3.8'
 services:
   postgresql:
     image: postgres:18-alpine
@@ -16,113 +16,113 @@ services:
       - .env
     networks:
       - default
-  analytics-service:
-    image: expd/${ANALYTICS_APP_NAME}
-    container_name: ${ANALYTICS_APP_NAME}
+
+  kafka:
+    image: apache/kafka:latest
+    container_name: kafka
     ports:
-      - ${ANALYTICS_PORT}:${ANALYTICS_PORT}
+      - "9092:9092"
+    environment:
+      # ---- KRaft basics ----
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+
+      # ---- Listeners ----
+      KAFKA_LISTENERS: >
+        INTERNAL://0.0.0.0:29092,
+        EXTERNAL://0.0.0.0:9092,
+        CONTROLLER://0.0.0.0:9093
+
+      KAFKA_ADVERTISED_LISTENERS: >
+        INTERNAL://kafka:29092,
+        EXTERNAL://localhost:9092
+
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: >
+        INTERNAL:PLAINTEXT,
+        EXTERNAL:PLAINTEXT,
+        CONTROLLER:PLAINTEXT
+
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+
+      # ---- Single-node sanity ----
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      CLUSTER_ID: 'MkU3OEVBNTcwNTJENDM2Qk'
+    networks:
+      - default
+
+  akhq:
+    image: tchiotludo/akhq
+    container_name: akhq
     depends_on:
-      - postgresql
-      - service-discovery
-    env_file:
-      - .env
-  authorization-service:
-    image: expd/${AUTHORIZATION_APP_NAME}
-    container_name: ${AUTHORIZATION_APP_NAME}
+      - kafka
     ports:
-      - ${AUTHORIZATION_PORT}:${AUTHORIZATION_PORT}
-    depends_on:
-      - postgresql
-      - service-discovery
-    env_file:
-      - .env
-  cart-management-service:
-    image: expd/cart-management-service
-    container_name: cart-management-service
+      - "8080:8080"
+    environment:
+      AKHQ_CONFIGURATION: |
+        akhq:
+          connections:
+            local:
+              properties:
+                bootstrap.servers: "kafka:29092"
+
+  kafdrop:
+    image: obsidiandynamics/kafdrop
+    restart: "no"
     ports:
-      - 4007:4007
-    depends_on:
-      - postgresql
-      - service-discovery
-    env_file:
-      - .env
-  crm-service:
-    image: expd/${CRM_APP_NAME}
-    container_name: ${CRM_APP_NAME}
-    ports:
-      - ${CRM_PORT}:${CRM_PORT}
-    depends_on:
-      - postgresql
-      - service-discovery
-      - authorization-service
-    env_file:
-      - .env
-  gateway-service:
-    image: expd/${GATEWAY_APP_NAME}
-    container_name: ${GATEWAY_APP_NAME}
-    ports:
-      - ${GATEWAY_PORT}:${GATEWAY_PORT}
-    env_file:
-      - .env
-    depends_on:
-      - service-discovery
-  inventory-service:
-    image: expd/${INVENTORY_DOCKER_IMAGE_NAME}
-    container_name: ${INVENTORY_APP_NAME}
-    ports:
-      - ${INVENTORY_PORT}:${INVENTORY_PORT}
-    depends_on:
-      - postgresql
-      - service-discovery
-    env_file:
-      - .env
-  notification-service:
-    image: expd/${NOTIFICATION_APP_NAME}
-    container_name: ${NOTIFICATION_APP_NAME}
-    ports:
-      - ${NOTIFICATION_PORT}:${NOTIFICATION_PORT}
-    depends_on:
-      - postgresql
-      - service-discovery
-    env_file:
-      - .env
-  order-management-service:
-    image: expd/${ORDER_MANAGEMENT_APP_NAME}
-    container_name: ${ORDER_MANAGEMENT_APP_NAME}
-    ports:
-      - ${ORDER_MANAGEMENT_PORT}:${ORDER_MANAGEMENT_PORT}
-    depends_on:
-      - postgresql
-      - service-discovery
-    env_file:
-      - .env
-  payment-service:
-    image: expd/${PAYMENT_APP_NAME}
-    container_name: ${PAYMENT_APP_NAME}
-    ports:
-      - ${PAYMENT_PORT}:${PAYMENT_PORT}
-    depends_on:
-      - postgresql
-      - service-discovery
-    env_file:
-      - .env
-  service-discovery:
-    image: expd/${EUREKA_APP_NAME}
-    container_name: service-discovery
-    ports:
-      - ${EUREKA_PORT}:${EUREKA_PORT}
-    env_file:
-      - .env
-  shipping-service:
-    image: expd/${SHIPPING_APP_NAME}
-    container_name: ${SHIPPING_APP_NAME}
-    ports:
-      - ${SHIPPING_PORT}:${SHIPPING_PORT}
-    depends_on:
-      - postgresql
-      - service-discovery
-    env_file:
-      - .env
+      - "9000:9000"
+    environment:
+      JVM_OPTS: "-Xms512M -Xmx512M"
+      KAFKA_BROKERCONNECT: "kafka:29092"
+    networks:
+      - default
+#      KAFKA_BROKERCONNECT=localhost:9092
+#  crmService:
+#    image: expd/${CRM_APP_NAME}
+#    container_name: ${CRM_APP_NAME}
+#    ports:
+#      - ${CRM_PORT}:${CRM_PORT}
+#    depends_on:
+#      - postgresql
+#      - service-discovery
+#      - authorization-service
+#    env_file:
+#      - .env
+
+#  gatewayService:
+#    image: expd/${GATEWAY_APP_NAME}
+#    container_name: ${GATEWAY_APP_NAME}
+#    ports:
+#      - ${GATEWAY_PORT}:${GATEWAY_PORT}
+#    env_file:
+#      - .env
+#    depends_on:
+#      - service-discovery
+
+
+#  notificationService:
+#    image: expd/${NOTIFICATION_APP_NAME}
+#    container_name: ${NOTIFICATION_APP_NAME}
+#    ports:
+#      - ${NOTIFICATION_PORT}:${NOTIFICATION_PORT}
+#    depends_on:
+#      - postgresql
+#      - service-discovery
+#    env_file:
+#      - .env
+#
+#  service-discovery:
+#    image: expd/${EUREKA_APP_NAME}
+#    container_name: service-discovery
+#    ports:
+#      - ${EUREKA_PORT}:${EUREKA_PORT}
+#    env_file:
+#      - .env
+
   pgadmin:
     image: dpage/pgadmin4
     environment:

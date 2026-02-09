@@ -4,12 +4,16 @@ import ke.co.interviewusercaseworld.commons.dto.requests.DefaultRequestHeader;
 import ke.co.interviewusercaseworld.commons.dto.requests.GenericRequest;
 import ke.co.interviewusercaseworld.commons.dto.responses.DefaultResponseHeader;
 import ke.co.interviewusercaseworld.commons.dto.responses.GenericResponse;
+import ke.co.interviewusercaseworld.commons.dto.responses.UserValidationResponse;
 import ke.co.interviewusercaseworld.commons.enums.LogLevelEnum;
 import ke.co.interviewusercaseworld.commons.enums.OperationNameEnum;
 import ke.co.interviewusercaseworld.commons.utils.Helpers;
 import ke.co.interviewusercaseworld.msorchestrator.model.dto.request.LoanApplicationRequest;
+import ke.co.interviewusercaseworld.msorchestrator.model.dto.response.LoanApplicationAcknowledgement;
 import ke.co.interviewusercaseworld.msorchestrator.model.dto.response.LoanApplicationResponse;
 import ke.co.interviewusercaseworld.msorchestrator.service.LoanProductService;
+import ke.co.interviewusercaseworld.msorchestrator.service.LoanService;
+import ke.co.interviewusercaseworld.msorchestrator.service.SecurityService;
 import ke.co.interviewusercaseworld.msorchestrator.utils.GlobalHelpers;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -28,20 +32,24 @@ public class LoansController {
 
     private final WebClient webClient;
     private final LoanProductService loanProductService;
-    private final LoanProductService loanProductService;
+    private final SecurityService securityService;
+    private final LoanService loanService;
 
     @PostMapping
-    public Mono<ResponseEntity<GenericResponse<DefaultResponseHeader, LoanApplicationResponse>>> apply(@RequestHeader Map<String, String> headers,
-                                                                                                       @RequestBody GenericRequest<DefaultRequestHeader, LoanApplicationRequest> request) {
-
-        Mono<GenericResponse<DefaultResponseHeader, LoanApplicationResponse>> response = loanProductService.validateProduct(headers,request);
+    public Mono<ResponseEntity<GenericResponse<DefaultResponseHeader, LoanApplicationAcknowledgement>>> apply(
+            @RequestBody GenericRequest<DefaultRequestHeader, LoanApplicationRequest> request) {
 
 
 
+        return loanService.apply(request)
 
-        // validate user
-        // create saga
-        // command disbursement service
+                .flatMap(res -> {
+                    if (res.getHeader().getResponseCode().name().startsWith("RC_2")){
+                        return Mono.just(ResponseEntity.ok(res));
+                    } else {
+                        return Mono.just(ResponseEntity.badRequest().body(res));
+                    }
+                });
 
     }
 }

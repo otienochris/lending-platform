@@ -1,6 +1,7 @@
 package ke.co.interviewusercaseworld.commons.configs;
 
 import ke.co.interviewusercaseworld.commons.enums.AuthTypeEnum;
+import ke.co.interviewusercaseworld.commons.enums.CommandsEnum;
 import ke.co.interviewusercaseworld.commons.enums.HttpVerbEnum;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -26,6 +27,17 @@ public class AppProperties {
     public static class OrchestratorProperties {
         private SecurityConfigSpec securityConfigSpec;
         private Map<String, ServiceSetup> externalMicroServices;
+        private KafkaConfigs kafkaConfigs;
+    }
+
+    @Data
+    @Builder
+    @AllArgsConstructor
+    @NoArgsConstructor
+    public static class KafkaConfigs {
+
+        private Map<CommandsEnum, String> topicsForCommand;
+
     }
 
     @Data

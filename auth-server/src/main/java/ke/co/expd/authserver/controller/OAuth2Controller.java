@@ -7,11 +7,10 @@ import ke.co.expd.authserver.model.dto.request.LoginRequest;
 import ke.co.expd.authserver.model.dto.request.RefreshTokenRequest;
 import ke.co.expd.authserver.model.dto.response.AuthResponse;
 import ke.co.expd.authserver.model.dto.response.OAuth2TokenResponse;
-import ke.co.expd.authserver.model.dto.response.UserValidationResponse;
 import ke.co.expd.authserver.service.AuthService;
-import ke.co.interviewusercaseworld.commons.dto.requests.DefaultRequestHeader;
 import ke.co.interviewusercaseworld.commons.dto.responses.DefaultResponseHeader;
 import ke.co.interviewusercaseworld.commons.dto.responses.GenericResponse;
+import ke.co.interviewusercaseworld.commons.dto.responses.UserValidationResponse;
 import ke.co.interviewusercaseworld.commons.enums.LogLevelEnum;
 import ke.co.interviewusercaseworld.commons.enums.LoginStrategyEnum;
 import ke.co.interviewusercaseworld.commons.enums.OperationNameEnum;
@@ -34,7 +33,6 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
-import static ke.co.interviewusercaseworld.commons.utils.Helpers.getDefaultRequestHeaderObject;
 import static org.springframework.http.HttpStatus.FOUND;
 import static org.springframework.http.HttpStatus.UNAUTHORIZED;
 
@@ -89,7 +87,7 @@ public class OAuth2Controller {
                     return Mono.just(ResponseEntity.badRequest().body(GenericResponse.<DefaultResponseHeader, UserValidationResponse>builder()
                                     .header(DefaultResponseHeader.builder()
                                             .sourceSystem("USSD")
-                                            .correlationId("")
+                                            .correlationId(null)
                                             .responseCode(ResponseCodes.RC_500)
                                             .customerMessage("Error occurred while validating user")
                                             .debugMessage(throwable.getMessage())

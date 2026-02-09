@@ -18,6 +18,7 @@ import ke.co.expd.authserver.service.RateLimitService;
 import ke.co.interviewusercaseworld.commons.dto.requests.DefaultRequestHeader;
 import ke.co.interviewusercaseworld.commons.dto.responses.DefaultResponseHeader;
 import ke.co.interviewusercaseworld.commons.dto.responses.GenericResponse;
+import ke.co.interviewusercaseworld.commons.dto.responses.UserValidationResponse;
 import ke.co.interviewusercaseworld.commons.enums.LogLevelEnum;
 import ke.co.interviewusercaseworld.commons.enums.OperationNameEnum;
 import ke.co.interviewusercaseworld.commons.enums.ResponseCodes;

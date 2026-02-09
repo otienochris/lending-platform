@@ -1,4 +1,4 @@
-package ke.co.expd.authserver.model.dto.response;
+package ke.co.interviewusercaseworld.commons.dto.responses;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
