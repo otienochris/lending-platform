@@ -1,19 +1,100 @@
+server:
+  port: 8086
 spring:
   application:
     name: ms-loan-repayment
+  kafka:
+    bootstrap-servers: localhost:9092
+    consumer:
+      group-id: loan-repayment
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
   cloud:
     config:
       enabled: false
   r2dbc:
     url: r2dbc:postgresql://localhost:5432
-    name: ecommerce
+    name: lending_platform
     username: apis
     password: apis
     pool:
       enabled: true
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          #          issuer-uri: ${misc.keycloak.baseurl}/realms/${misc.keycloak.realm}
+          issuer-uri: http://localhost:4011
+          jwk-set-uri: ${spring.security.oauth2.resourceserver.jwt.issuer-uri}/.well-known/jwks.json
+      client:
+        registration:
+          keycloak:
+            client-id: ${sping.application.name}
+            authorization-grant-type: authorization_code
+            scope:
+              - openid
+        provider:
+          keycloak:
+            issuer-uri: ${spring.security.oauth2.resourceserver.jwt.issuer-uri}
+            user-name-attribute: preferred_username
+
 eureka:
   client:
     serviceUrl:
       defaultZone: http://localhost:8761/eureka
     register-with-eureka: false
     fetch-registry: false
+
+logging:
+  file: logs/${spring.application.name}.logs
+
+  max-size: 10MB
+  max-history: 30
+  pattern:
+    file: "%d{yyyy-MM-dd HH:mm:ss.SSS} | severity=%5p | application=${spring.application.name} | thread=%15.15t | %m%n"
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} | severity=%5p | application=${spring.application.name} | thread=%15.15t | %m%n"
+
+
+
+app:
+  service-properties:
+    loan-repayment-properties:
+      kafka-configs:
+        topics-for-command:
+          REPAYMENT_COMMAND: "loan.repayment.command"
+          REPAYMENT_EVENT: "loan.repayment.event"
+
+      securityConfigSpec:
+        whitelistedPaths:
+          - "/actuator/health"
+          - "/actuator/info"
+          - "/v3/api-docs/**"
+          - "/swagger-ui.html"
+          - "/swagger-ui/**"
+          - "/webjars/**"
+        corsConfigs:
+          - mapping: "/**"
+            allowed-origins:
+              - http://localhost:3000
+              - http://localhost:8080
+            allowed-methods:
+              - GET
+              - POST
+              - OPTION
+              - DELETE
+              - PUT
+            allowed-headers:
+              - "*"
+            allow-credentials: true
+        jwtSpec:
+          resourceId: ${spring.application.name}
+          principalAttribute: preferred_username
+          issuerUri: http://localhost:4011
+          jwkSetUri: ${app.service-properties.orchestrator-properties.securityConfigSpec.jwtSpec.issuerUri}/.well-known/jwks.json
+
+
+

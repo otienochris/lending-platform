@@ -1,8 +1,8 @@
 server:
-  port: ${AUTH_PORT}
+  port: 4011
 spring:
   application:
-    name: ${AUTH_APP_NAME}
+    name: auth-server
   kafka:
     bootstrap-servers: localhost:9092
     consumer:
@@ -26,10 +26,6 @@ spring:
       #Set Database Connection Request Timeout to 60secs and maximum connections to 500
       connection-timeout: 60000
       maximum-pool-size: 100
-  server:
-    port: ${AUTH_PORT}
-    servlet:
-      context-path: ${AUTH_CONTEXT_PATH}
   logging:
     pattern:
       file: "%d{yyyy-MM-dd HH:mm:ss.SSS} | severity=%5p | application=${spring.application.name} | thread=%15.15t | %m%n"
@@ -74,16 +70,16 @@ app:
       - "/api/v1/users"
 
     jwtSpec:
-      secret: ${JWT_SECRET}
-      expiration: ${JWT_EXPIRATION}
-      refreshExpiration: ${JWT_REFRESH_EXPIRATION}
-      issuer: ${JWT_ISSUER}
+      secret: dev-jwt-256-bit-secret-must-be-at-least-32-char
+      expiration: 36000
+      refreshExpiration: 4000
+      issuer: http://localhost:4011
     password-spec:
       passwordLength: 12
 auth:
   security:
     password-encoder:
-      strength: ${PASSWORD_STRENGTH}
+      strength: 12
     cors:
       allowed-origins: "http://localhost:3000,http://localhost:8080"
       allowed-methods: "*"

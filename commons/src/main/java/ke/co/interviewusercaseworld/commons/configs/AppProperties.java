@@ -21,7 +21,18 @@ public class AppProperties {
     private OrchestratorProperties orchestratorProperties;
     private AuthServerProperties authServerProperties;
     private LoanDisbursementProperties loanDisbursementProperties;
+    private LoanRepaymentProperties loanRepaymentProperties;
 
+
+    @Data
+    @Builder
+    @AllArgsConstructor
+    @NoArgsConstructor
+    public static class LoanRepaymentProperties {
+        private SecurityConfigSpec securityConfigSpec;
+        private Map<String, ServiceSetup> externalMicroServices;
+        private KafkaConfigs kafkaConfigs;
+    }
     @Data
     @Builder
     @AllArgsConstructor

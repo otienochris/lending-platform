@@ -3,15 +3,12 @@ package ke.co.interviewusercaseworld.msorchestrator.consumers;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import ke.co.interviewusercaseworld.commons.dto.commands.DisbursementCommand;
+import ke.co.interviewusercaseworld.commons.dto.commands.RepaymentCommand;
 import ke.co.interviewusercaseworld.commons.dto.requests.DefaultRequestHeader;
 import ke.co.interviewusercaseworld.commons.dto.requests.GenericRequest;
-import ke.co.interviewusercaseworld.commons.enums.CommandsEnum;
-import ke.co.interviewusercaseworld.commons.enums.LogLevelEnum;
-import ke.co.interviewusercaseworld.commons.enums.NotificationTypeEnum;
-import ke.co.interviewusercaseworld.commons.enums.OperationNameEnum;
+import ke.co.interviewusercaseworld.commons.enums.*;
 import ke.co.interviewusercaseworld.commons.utils.Helpers;
 import ke.co.interviewusercaseworld.msorchestrator.model.dto.request.LoanApplicationRequest;
-import ke.co.interviewusercaseworld.msorchestrator.model.dto.request.LoanRepaymentRequest;
 import ke.co.interviewusercaseworld.msorchestrator.model.dto.request.commands.NotificationCommand;
 import ke.co.interviewusercaseworld.msorchestrator.model.dto.request.commands.UserValidationCommand;
 import ke.co.interviewusercaseworld.msorchestrator.model.dto.request.events.*;
@@ -27,7 +24,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.reactive.TransactionalOperator;
 import reactor.core.publisher.Mono;
 
-import java.time.LocalDateTime;
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -56,10 +53,10 @@ public class EventListeners {
         Helpers.log("", LogLevelEnum.INFO, OperationNameEnum.KAFKA_CONSUMER, "Received message from product.validation.event: " + payload, null);
 
         ProductValidationEvent productValidationEvent;
-        try{
+        try {
             productValidationEvent = objectMapper.readValue(payload, ProductValidationEvent.class);
             Helpers.log("product.validation.event", LogLevelEnum.INFO, OperationNameEnum.KAFKA_CONSUMER, "Parsed product.validation.event", null);
-        } catch (Exception e){
+        } catch (Exception e) {
             Helpers.log("", LogLevelEnum.ERROR, OperationNameEnum.KAFKA_CONSUMER, "Error parsing product.validation.event", e);
             return Mono.empty();
         }
@@ -118,10 +115,10 @@ public class EventListeners {
 
         UserValidationEvent userValidationEvent;
 
-        try{
+        try {
             userValidationEvent = objectMapper.readValue(payload, UserValidationEvent.class);
             Helpers.log("user.validation.event", LogLevelEnum.INFO, OperationNameEnum.KAFKA_CONSUMER, "Parsed user.validation.event", null);
-        } catch (Exception e){
+        } catch (Exception e) {
             Helpers.log("", LogLevelEnum.ERROR, OperationNameEnum.KAFKA_CONSUMER, "Error parsing user.validation.event", e);
             return Mono.empty();
         }
@@ -136,7 +133,8 @@ public class EventListeners {
                             String payloadString;
 
                             try {
-                                originalRequest = objectMapper.readValue(saga.getOriginalRequest(), new TypeReference<GenericRequest<DefaultRequestHeader, LoanApplicationRequest>>() {});
+                                originalRequest = objectMapper.readValue(saga.getOriginalRequest(), new TypeReference<GenericRequest<DefaultRequestHeader, LoanApplicationRequest>>() {
+                                });
                                 System.out.println("Original request: " + originalRequest);
                                 DisbursementCommand command = DisbursementCommand.builder()
                                         .destinationWallet(originalRequest.getBody().getWalletType())
@@ -199,12 +197,16 @@ public class EventListeners {
                             GenericRequest<DefaultRequestHeader, LoanApplicationRequest> originalRequest;
                             String payloadString;
                             try {
-                                originalRequest = objectMapper.readValue(saga.getOriginalRequest(), new com.fasterxml.jackson.core.type.TypeReference<GenericRequest<DefaultRequestHeader, LoanApplicationRequest>>() {});
-                                LoanRepaymentRequest command = LoanRepaymentRequest.builder()
-                                        .totalLoanAmount(disbursementEvent.getTotalAmountToBePaid())
+                                originalRequest = objectMapper.readValue(saga.getOriginalRequest(), new com.fasterxml.jackson.core.type.TypeReference<GenericRequest<DefaultRequestHeader, LoanApplicationRequest>>() {
+                                });
+                                RepaymentCommand command = RepaymentCommand.builder()
+                                        .principal(originalRequest.getBody().getLoanAmount())
                                         .loanId(loanId)
-                                        .dueDate(disbursementEvent.getDueDate())
-                                        .installments(disbursementEvent.getInstallments())
+                                        .productId(originalRequest.getBody().getProductId())
+                                        .tenure(originalRequest.getBody().getTenure())
+                                        .interestRate(BigDecimal.TEN)// todo
+                                        .commandId(loanId)
+                                        .tenureType(TenureOptionsTypeEnum.MONTHS)
                                         .customerId(originalRequest.getBody().getCustomerId())
                                         .build();
 
@@ -240,7 +242,7 @@ public class EventListeners {
 
     @KafkaListener(topics = {"loan.repayment.event"}, groupId = "orchestrator")
     public Mono<Void> onRepaymentEvent(String payload) {
-        Helpers.log("", LogLevelEnum.INFO, OperationNameEnum.KAFKA_CONSUMER, "Received message from loan.repayment.event", null);
+        Helpers.log("", LogLevelEnum.INFO, OperationNameEnum.KAFKA_CONSUMER, "Received message from loan.repayment.event: " + payload, null);
         RepaymentEvent repaymentEvent;
         try {
             repaymentEvent = objectMapper.readValue(payload, RepaymentEvent.class);
@@ -251,6 +253,7 @@ public class EventListeners {
 
         UUID loanId = repaymentEvent.getCommandId();
 
+        RepaymentEvent finalRepaymentEvent = repaymentEvent;
         return sagaRepo.findByBusinessKey(loanId)
                 .flatMap(saga -> stepRepo.findBySagaIdAndStepName(saga.getId(), LOAN_REPAYMENT_STEP)
                         .flatMap(sagaStep -> tx.execute(status -> {
@@ -265,9 +268,9 @@ public class EventListeners {
                                     .template("SUCCESSFUL_LOAN_DISBURSEMENT")
                                     .types(List.of(NotificationTypeEnum.SMS, NotificationTypeEnum.EMAIL))
                                     .templateParamValues(Map.of(
-                                            "AMOUNT", repaymentEvent.getTotalLoanAmount(),
-                                            "DUE_DATE", repaymentEvent.getDueDate(),
-                                            "TOTAL_INTEREST", repaymentEvent.getTotalInterest()))
+                                            "AMOUNT", finalRepaymentEvent.getTotalLoanAmount(),
+                                            "DUE_DATE", finalRepaymentEvent.getDueDate(),
+                                            "TOTAL_INTEREST", finalRepaymentEvent.getTotalInterest()))
                                     .principal(NotificationCommand.Recipient.builder()
                                             .msisdn("254742887480")
                                             .to(List.of("ohtischris@gmail.com"))

@@ -1,4 +1,4 @@
-package ke.co.interviewusercaseworld.commons.dto.commands;
+package ke.co.interviewusercaseworld.repayment.model.dto.requests;
 
 import ke.co.interviewusercaseworld.commons.enums.InterestRateTypeEnum;
 import ke.co.interviewusercaseworld.commons.enums.TenureOptionsTypeEnum;
@@ -14,8 +14,7 @@ import java.util.UUID;
 @Builder
 @AllArgsConstructor
 @NoArgsConstructor
-public class RepaymentCommand {
-    private UUID commandId;
+public class LoanRepaymentSchedulingDto {
     private UUID loanId;
     private UUID customerId;
     private UUID productId;
@@ -25,5 +24,4 @@ public class RepaymentCommand {
     private Integer tenure;
     private TenureOptionsTypeEnum tenureType;
     private Boolean isInstallment;
-
 }

@@ -7,6 +7,9 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+import java.math.BigDecimal;
+import java.math.MathContext;
+import java.math.RoundingMode;
 import java.net.URI;
 import java.util.Map;
 import java.util.Objects;
@@ -94,5 +97,45 @@ public class Helpers {
                 .operation(operation.isBlank() ? OperationNameEnum.UNSPECIFIED: OperationNameEnum.valueOf(operation))
                 .token(token)
                 .build();
+    }
+
+
+    private static final MathContext MC = new MathContext(15, RoundingMode.HALF_UP);
+
+
+    /**
+     * EMI formula (reducing balance)
+     *
+     * P = principal
+     * r = annualInterestRate / 12 / 100
+     * n = number of months
+     *
+     * EMI = P * r * (1 + r)^n / ((1 + r)^n - 1)
+     * @param principal
+     * @param annualRate
+     * @param months
+     * @return
+     */
+
+    public static BigDecimal calculateEmi(
+            BigDecimal principal,
+            BigDecimal annualRate,
+            int months
+    ) {
+        BigDecimal monthlyRate = annualRate
+                .divide(BigDecimal.valueOf(12), MC)
+                .divide(BigDecimal.valueOf(100), MC);
+
+        BigDecimal onePlusRPowerN =
+                monthlyRate.add(BigDecimal.ONE).pow(months, MC);
+
+        BigDecimal numerator =
+                principal.multiply(monthlyRate).multiply(onePlusRPowerN);
+
+        BigDecimal denominator =
+                onePlusRPowerN.subtract(BigDecimal.ONE);
+
+        return numerator
+                .divide(denominator, 2, RoundingMode.HALF_UP);
     }
 }

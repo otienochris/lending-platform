@@ -4,27 +4,15 @@ import ke.co.interviewusercaseworld.commons.dto.requests.DefaultRequestHeader;
 import ke.co.interviewusercaseworld.commons.dto.requests.GenericRequest;
 import ke.co.interviewusercaseworld.commons.dto.responses.DefaultResponseHeader;
 import ke.co.interviewusercaseworld.commons.dto.responses.GenericResponse;
-import ke.co.interviewusercaseworld.commons.dto.responses.UserValidationResponse;
-import ke.co.interviewusercaseworld.commons.enums.LogLevelEnum;
 import ke.co.interviewusercaseworld.commons.enums.OperationNameEnum;
 import ke.co.interviewusercaseworld.commons.enums.ResponseCodes;
-import ke.co.interviewusercaseworld.commons.utils.Helpers;
 import ke.co.interviewusercaseworld.msorchestrator.model.dto.request.LoanApplicationRequest;
 import ke.co.interviewusercaseworld.msorchestrator.model.dto.response.LoanApplicationAcknowledgement;
-import ke.co.interviewusercaseworld.msorchestrator.model.dto.response.LoanApplicationResponse;
-import ke.co.interviewusercaseworld.msorchestrator.service.LoanProductService;
 import ke.co.interviewusercaseworld.msorchestrator.service.LoanService;
-import ke.co.interviewusercaseworld.msorchestrator.service.SecurityService;
-import ke.co.interviewusercaseworld.msorchestrator.utils.GlobalHelpers;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
-
-import java.util.Map;
-
-import static ke.co.interviewusercaseworld.commons.utils.Helpers.getDefaultRequestHeaderObject;
 
 @RestController
 @RequestMapping("/api/v1/loans")
@@ -47,18 +35,16 @@ public class LoansController {
                     } else {
                         return Mono.just(ResponseEntity.badRequest().body(res));
                     }
-                }).onErrorResume(throwable -> {
-                    return Mono.just(ResponseEntity.badRequest().body(GenericResponse.<DefaultResponseHeader, LoanApplicationAcknowledgement>builder()
-                                    .header(DefaultResponseHeader.builder()
-                                            .operation(OperationNameEnum.LOAN_APPLICATION)
-                                            .responseRefId("")
-                                            .responseCode(ResponseCodes.RC_400)
-                                            .customerMessage("Error occurred while applying for loan")
-                                            .debugMessage(throwable.getMessage())
-                                            .sourceSystem("MS-LOAN-DISBURSEMENT")
-                                            .build())
-                            .build()));
-                });
+                }).onErrorResume(throwable -> Mono.just(ResponseEntity.badRequest().body(GenericResponse.<DefaultResponseHeader, LoanApplicationAcknowledgement>builder()
+                                .header(DefaultResponseHeader.builder()
+                                        .operation(OperationNameEnum.LOAN_APPLICATION)
+                                        .responseRefId("")
+                                        .responseCode(ResponseCodes.RC_400)
+                                        .customerMessage("Error occurred while applying for loan")
+                                        .debugMessage(throwable.getMessage())
+                                        .sourceSystem("MS-LOAN-DISBURSEMENT")
+                                        .build())
+                        .build())));
 
     }
 }
