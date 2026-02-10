@@ -24,13 +24,13 @@ public class OutboxPublisher {
 
     @Scheduled(fixedDelay = 30000)
     public void publishOutboxEvent(){
-        Helpers.log("PUBLISH_OUT_BOX_EVENT", LogLevelEnum.info, OperationNameEnum.PUBLISH_OUTBOX_EVENTS_TASK, "publishing outbox events", null);
 
         outboxRepo.findTop20ByIsPublishedFalse()
                 .flatMap(outBoxEvent -> {
-                    CommandsEnum commandsEnum = CommandsEnum.valueOf(outBoxEvent.getEventType());
+                    String eventType = outBoxEvent.getEventType();
+                    CommandsEnum commandsEnum = CommandsEnum.valueOf(eventType);
                     String topic = appProperties.getServiceProperties().getOrchestratorProperties().getKafkaConfigs().getTopicsForCommand().getOrDefault(commandsEnum, "");
-                    Helpers.log("PUBLISH_OUT_BOX_EVENT", LogLevelEnum.info, OperationNameEnum.PUBLISH_OUTBOX_EVENTS_TASK, "publishing outbox events to topic: " + topic, null);
+                    Helpers.log("PUBLISH_OUT_BOX_EVENT", LogLevelEnum.info, OperationNameEnum.PUBLISH_OUTBOX_EVENTS_TASK, "publishing outbox events ["+eventType+"] to topic: " + topic , null);
                     if (!topic.isEmpty()) {
                         return Mono.fromFuture(kafka.send(topic, outBoxEvent.getAggregateId(), outBoxEvent.getPayload()))
                                 .then(markAsPublished(outBoxEvent));

@@ -1,5 +1,6 @@
 package ke.co.interviewusercaseworld.msorchestrator.model.dto.request;
 
+import ke.co.interviewusercaseworld.commons.enums.WalletTypeEnum;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -14,9 +15,9 @@ import java.util.UUID;
 @AllArgsConstructor
 @NoArgsConstructor
 public class LoanRepaymentRequest {
-    private UUID loanId;
-    private BigDecimal totalLoanAmount;
-    private Integer installments;
-    private LocalDateTime dueDate;
+    private UUID loanScheduleId;
     private UUID customerId;
+    private BigDecimal amount;
+    private WalletTypeEnum walletType;
+    private String walletId;
 }

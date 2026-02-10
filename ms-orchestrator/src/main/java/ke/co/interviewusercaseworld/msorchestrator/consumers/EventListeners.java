@@ -4,12 +4,14 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import ke.co.interviewusercaseworld.commons.dto.commands.DisbursementCommand;
 import ke.co.interviewusercaseworld.commons.dto.commands.RepaymentCommand;
+import ke.co.interviewusercaseworld.commons.dto.commands.RepaymentSchedulingCommand;
 import ke.co.interviewusercaseworld.commons.dto.events.*;
 import ke.co.interviewusercaseworld.commons.dto.requests.DefaultRequestHeader;
 import ke.co.interviewusercaseworld.commons.dto.requests.GenericRequest;
 import ke.co.interviewusercaseworld.commons.enums.*;
 import ke.co.interviewusercaseworld.commons.utils.Helpers;
 import ke.co.interviewusercaseworld.msorchestrator.model.dto.request.LoanApplicationRequest;
+import ke.co.interviewusercaseworld.msorchestrator.model.dto.request.LoanRepaymentRequest;
 import ke.co.interviewusercaseworld.msorchestrator.model.dto.request.commands.NotificationCommand;
 import ke.co.interviewusercaseworld.msorchestrator.model.dto.request.commands.UserValidationCommand;
 import ke.co.interviewusercaseworld.msorchestrator.model.entities.OutBoxEvent;
@@ -19,6 +21,7 @@ import ke.co.interviewusercaseworld.msorchestrator.repository.OutBoxEventReposit
 import ke.co.interviewusercaseworld.msorchestrator.repository.SagaRepository;
 import ke.co.interviewusercaseworld.msorchestrator.repository.SagaStepRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.experimental.Helper;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.reactive.TransactionalOperator;
@@ -30,6 +33,7 @@ import java.util.Map;
 import java.util.UUID;
 
 import static java.time.LocalDateTime.now;
+import static ke.co.interviewusercaseworld.msorchestrator.service.impl.LoanServiceImpl.LOAN_VALIDATION_STEP;
 
 @Component
 @RequiredArgsConstructor
@@ -40,8 +44,9 @@ public class EventListeners {
     public static final String LOAN_AGGREGATE = "LOAN";
     public static final String LOAN_DISBURSEMENT_STEP = "LOAN_DISBURSEMENT";
     public static final String COMPLETED_STATUS = "COMPLETED";
-    public static final String LOAN_REPAYMENT_STEP = "LOAN_REPAYMENT";
+    public static final String LOAN_REPAYMENT_SCHEDULING_STEP = "LOAN_REPAYMENT_SCHEDULING";
     public static final String NOTIFY_CUSTOMER_STEP = "NOTIFY_CUSTOMER";
+    public static final String LOAN_REPAYMENT_STEP = "LOAN_REPAYMENT";
     private final ObjectMapper objectMapper;
     private final SagaRepository sagaRepo;
     private final TransactionalOperator tx;
@@ -267,7 +272,7 @@ public class EventListeners {
                                             .build();
                                     payloadString = objectMapper.writeValueAsString(notificationCommand);
                                 } else {
-                                    RepaymentCommand command = RepaymentCommand.builder()
+                                    RepaymentSchedulingCommand command = RepaymentSchedulingCommand.builder()
                                             .principal(originalRequest.getBody().getLoanAmount())
                                             .loanId(loanId)
                                             .productId(originalRequest.getBody().getProductId())
@@ -287,7 +292,7 @@ public class EventListeners {
                                 throw new RuntimeException(e);
                             }
 
-                            saga.setCurrentStep(LOAN_REPAYMENT_STEP);
+                            saga.setCurrentStep(LOAN_REPAYMENT_SCHEDULING_STEP);
                             saga.setUpdatedAt(now());
 
                             sagaStep.setStatus(COMPLETED_STATUS);
@@ -310,13 +315,13 @@ public class EventListeners {
                                         .createdAt(now())
                                         .isPublished(false)
                                         .payload(payloadString)
-                                        .eventType(CommandsEnum.REPAYMENT_COMMAND.name())
+                                        .eventType(CommandsEnum.REPAYMENT_SCHEDULING_COMMAND.name())
                                         .build();
                             }
 
 
                             return stepRepo.save(sagaStep)
-                                    .then(stepRepo.save(nextStep(saga, LOAN_REPAYMENT_STEP)))
+                                    .then(stepRepo.save(nextStep(saga, LOAN_REPAYMENT_SCHEDULING_STEP)))
                                     .then(outboxRepo.save(outBoxEvent))
                                     .then(sagaRepo.save(saga));
 
@@ -324,23 +329,23 @@ public class EventListeners {
 
     }
 
-    @KafkaListener(topics = {"loan.repayment.event"}, groupId = "orchestrator")
-    public Mono<Void> onRepaymentEvent(String payload) {
-        Helpers.log("", LogLevelEnum.INFO, OperationNameEnum.KAFKA_CONSUMER, "Received message from loan.repayment.event: " + payload, null);
-        RepaymentEvent repaymentEvent;
+    @KafkaListener(topics = {"loan.repayment.scheduling.event"}, groupId = "orchestrator")
+    public Mono<Void> onRepaymentSchedulingEvent(String payload) {
+        Helpers.log("", LogLevelEnum.INFO, OperationNameEnum.KAFKA_CONSUMER, "Received message from loan.repayment.scheduling.event: " + payload, null);
+        RepaymentSchedulingEvent repaymentSchedulingEvent;
         try {
-            repaymentEvent = objectMapper.readValue(payload, RepaymentEvent.class);
+            repaymentSchedulingEvent = objectMapper.readValue(payload, RepaymentSchedulingEvent.class);
         } catch (Exception e) {
-            Helpers.log("", LogLevelEnum.ERROR, OperationNameEnum.KAFKA_CONSUMER, "Error parsing loan.repayment.event", e);
+            Helpers.log("", LogLevelEnum.ERROR, OperationNameEnum.KAFKA_CONSUMER, "Error parsing loan.repayment.scheduling.event", e);
             return Mono.empty();
         }
 
-        UUID loanId = repaymentEvent.getCommandId();
+        UUID loanId = repaymentSchedulingEvent.getCommandId();
 
-        RepaymentEvent finalRepaymentEvent = repaymentEvent;
-        boolean notSuccessful = !ResponseCodes.RC_200.name().equalsIgnoreCase(finalRepaymentEvent.getStatus());
+        RepaymentSchedulingEvent finalRepaymentSchedulingEvent = repaymentSchedulingEvent;
+        boolean notSuccessful = !ResponseCodes.RC_200.name().equalsIgnoreCase(finalRepaymentSchedulingEvent.getStatus());
         return sagaRepo.findByBusinessKey(loanId)
-                .flatMap(saga -> stepRepo.findBySagaIdAndStepName(saga.getId(), LOAN_REPAYMENT_STEP)
+                .flatMap(saga -> stepRepo.findBySagaIdAndStepName(saga.getId(), LOAN_REPAYMENT_SCHEDULING_STEP)
                         .flatMap(sagaStep -> tx.execute(status -> {
 
                             saga.setCurrentStep(NOTIFY_CUSTOMER_STEP);
@@ -351,7 +356,7 @@ public class EventListeners {
                             String payloadString;
                             try {
                                 if (notSuccessful) {
-                                    String message = finalRepaymentEvent.getMessage();
+                                    String message = finalRepaymentSchedulingEvent.getMessage();
                                     NotificationCommand notificationCommand = NotificationCommand.builder()
                                             .commandId(loanId)
                                             .types(List.of(NotificationTypeEnum.SMS, NotificationTypeEnum.EMAIL))
@@ -366,9 +371,9 @@ public class EventListeners {
                                             .template("SUCCESSFUL_LOAN_DISBURSEMENT")
                                             .types(List.of(NotificationTypeEnum.SMS, NotificationTypeEnum.EMAIL))
                                             .templateParamValues(Map.of(
-                                                    "AMOUNT", finalRepaymentEvent.getTotalLoanAmount(),
-                                                    "DUE_DATE", finalRepaymentEvent.getDueDate(),
-                                                    "TOTAL_INTEREST", finalRepaymentEvent.getTotalInterest()))
+                                                    "AMOUNT", finalRepaymentSchedulingEvent.getTotalLoanAmount(),
+                                                    "DUE_DATE", finalRepaymentSchedulingEvent.getDueDate(),
+                                                    "TOTAL_INTEREST", finalRepaymentSchedulingEvent.getTotalInterest()))
                                             .principal(NotificationCommand.Recipient.builder()
                                                     .msisdn("254742887480")
                                                     .to(List.of("ohtischris@gmail.com"))
@@ -392,6 +397,256 @@ public class EventListeners {
 
                             return stepRepo.save(sagaStep)
                                     .then(stepRepo.save(nextStep(saga, NOTIFY_CUSTOMER_STEP)))
+                                    .then(outboxRepo.save(outBoxEvent))
+                                    .then(sagaRepo.save(saga));
+
+                        }).then()));
+
+    }
+
+
+    @KafkaListener(topics = {"loan.repayment.prevalidation.event"}, groupId = "orchestrator")
+    public Mono<Void> onRepaymentPrevalidationEvent(String payload) {
+        Helpers.log("", LogLevelEnum.INFO, OperationNameEnum.KAFKA_CONSUMER, "Received message from loan.repayment.prevalidation.event: " + payload, null);
+        RepaymentEvent repaymentEvent;
+        try {
+            repaymentEvent = objectMapper.readValue(payload, RepaymentEvent.class);
+        } catch (Exception e) {
+            Helpers.log("", LogLevelEnum.ERROR, OperationNameEnum.KAFKA_CONSUMER, "Error parsing loan.repayment.prevalidation.event", e);
+            return Mono.empty();
+        }
+
+        UUID loanId = repaymentEvent.getCommandId();
+
+        RepaymentEvent finalRepaymentEvent = repaymentEvent;
+        boolean notSuccessful = !ResponseCodes.RC_200.name().equalsIgnoreCase(finalRepaymentEvent.getStatus());
+        return sagaRepo.findByBusinessKey(loanId)
+                .flatMap(saga -> stepRepo.findBySagaIdAndStepName(saga.getId(), LOAN_VALIDATION_STEP)
+                        .flatMap(sagaStep -> tx.execute(status -> {
+
+                            GenericRequest<DefaultRequestHeader, LoanRepaymentRequest> originalRequest;
+                            try {
+                                originalRequest = objectMapper.readValue(saga.getOriginalRequest(), new TypeReference<GenericRequest<DefaultRequestHeader, LoanRepaymentRequest>>() {});
+                            } catch (Exception e) {
+                                Helpers.log("", LogLevelEnum.ERROR, OperationNameEnum.KAFKA_CONSUMER, "Error parsing loan application request", e);
+                                throw new RuntimeException(e);
+                            }
+
+                            saga.setCurrentStep(LOAN_REPAYMENT_STEP);
+                            saga.setUpdatedAt(now());
+
+                            sagaStep.setStatus(COMPLETED_STATUS);
+
+                            String payloadString;
+                            OutBoxEvent outBoxEvent;
+                            try {
+                                if (notSuccessful) {
+                                    String message = finalRepaymentEvent.getMessage();
+                                    Helpers.log("loan.repayment.prevalidation.event", LogLevelEnum.INFO, OperationNameEnum.KAFKA_CONSUMER, "Sending notification event: " + message, null);
+                                    NotificationCommand notificationCommand = NotificationCommand.builder()
+                                            .commandId(loanId)
+                                            .types(List.of(NotificationTypeEnum.SMS, NotificationTypeEnum.EMAIL))
+                                            .template("REPAYMENT_PREVALIDATION_FAILED_TEMPLATE")
+                                            .principal(NotificationCommand.Recipient.builder().build())
+                                            .templateParamValues(Map.of("CUSTOMER_MESSAGE", message == null ? "Disbursement failed" : message))
+                                            .build();
+                                    payloadString = objectMapper.writeValueAsString(notificationCommand);
+                                    outBoxEvent = OutBoxEvent.builder()
+                                            .aggregateType(LOAN_AGGREGATE)
+                                            .aggregateId(loanId.toString())
+                                            .createdAt(now())
+                                            .isPublished(false)
+                                            .payload(payloadString)
+                                            .eventType(CommandsEnum.NOTIFY_COMMAND.name())
+                                            .build();
+                                } else {
+                                    Helpers.log("loan.repayment.prevalidation.event", LogLevelEnum.INFO, OperationNameEnum.KAFKA_CONSUMER, "saving loan repayment command" + finalRepaymentEvent.getMessage(), null);
+
+
+                                        RepaymentCommand command = RepaymentCommand.builder()
+                                                .commandId(loanId)
+                                                .amount(originalRequest.getBody().getAmount())
+                                                .loanScheduleId(originalRequest.getBody().getLoanScheduleId())
+                                                .walletType(originalRequest.getBody().getWalletType())
+                                                .walletId(originalRequest.getBody().getWalletId())
+                                                .isValidated(true)
+                                                .build();
+                                        payloadString = objectMapper.writeValueAsString(command);
+                                        outBoxEvent = OutBoxEvent.builder()
+                                                .aggregateType(LOAN_AGGREGATE)
+                                                .aggregateId(loanId.toString())
+                                                .createdAt(now())
+                                                .isPublished(false)
+                                                .payload(payloadString)
+                                                .eventType(CommandsEnum.REPAYMENT_COMMAND.name())
+                                                .build();
+
+                                        /*String message = finalRepaymentEvent.getMessage();
+                                        Helpers.log("loan.repayment.prevalidation.event", LogLevelEnum.INFO, OperationNameEnum.KAFKA_CONSUMER, "Sending notification event: " + message, null);
+                                        NotificationCommand notificationCommand = NotificationCommand.builder()
+                                                .commandId(loanId)
+                                                .types(List.of(NotificationTypeEnum.SMS, NotificationTypeEnum.EMAIL))
+                                                .template("REPAYMENT_SUCCESSFUL_TEMPLATE")
+                                                .principal(NotificationCommand.Recipient.builder().build())
+                                                .templateParamValues(Map.of("CUSTOMER_MESSAGE", message == null ? "Disbursement failed" : message, "amount", originalRequest.getBody().getAmount().toString()))
+                                                .build();
+                                        payloadString = objectMapper.writeValueAsString(notificationCommand);
+                                        outBoxEvent = OutBoxEvent.builder()
+                                                .aggregateType(LOAN_AGGREGATE)
+                                                .aggregateId(loanId.toString())
+                                                .createdAt(now())
+                                                .isPublished(false)
+                                                .payload(payloadString)
+                                                .eventType(CommandsEnum.NOTIFY_EVENT.name())
+                                                .build();
+
+                                        String message = finalRepaymentEvent.getMessage();
+                                        Helpers.log("loan.repayment.prevalidation.event", LogLevelEnum.INFO, OperationNameEnum.KAFKA_CONSUMER, "Sending notification event: " + message, null);
+                                        NotificationCommand notificationCommand = NotificationCommand.builder()
+                                                .commandId(loanId)
+                                                .types(List.of(NotificationTypeEnum.SMS, NotificationTypeEnum.EMAIL))
+                                                .template("REPAYMENT_FAILED_TEMPLATE")
+                                                .principal(NotificationCommand.Recipient.builder().build())
+                                                .templateParamValues(Map.of("CUSTOMER_MESSAGE", message == null ? "Disbursement failed" : message))
+                                                .build();
+                                        payloadString = objectMapper.writeValueAsString(notificationCommand);
+                                        outBoxEvent = OutBoxEvent.builder()
+                                                .aggregateType(LOAN_AGGREGATE)
+                                                .aggregateId(loanId.toString())
+                                                .createdAt(now())
+                                                .isPublished(false)
+                                                .payload(payloadString)
+                                                .eventType(CommandsEnum.NOTIFY_EVENT.name())
+                                                .build();
+                                    */
+                                }
+                            } catch (Exception e) {
+                                Helpers.log("", LogLevelEnum.ERROR, OperationNameEnum.KAFKA_CONSUMER, "Error creating notification command", e);
+                                throw new RuntimeException(e);
+                            }
+
+
+
+                            return stepRepo.save(sagaStep)
+                                    .then(stepRepo.save(nextStep(saga, LOAN_REPAYMENT_STEP)))
+                                    .then(outboxRepo.save(outBoxEvent))
+                                    .then(sagaRepo.save(saga));
+
+                        }).then()));
+
+    }
+
+
+    @KafkaListener(topics = {"loan.repayment.event"}, groupId = "orchestrator")
+    public Mono<Void> onRepaymentEvent(String payload) {
+        Helpers.log("", LogLevelEnum.INFO, OperationNameEnum.KAFKA_CONSUMER, "Received message from loan.repayment.event: " + payload, null);
+        RepaymentEvent repaymentEvent;
+        try {
+            repaymentEvent = objectMapper.readValue(payload, RepaymentEvent.class);
+        } catch (Exception e) {
+            Helpers.log("", LogLevelEnum.ERROR, OperationNameEnum.KAFKA_CONSUMER, "Error parsing loan.repayment.event", e);
+            return Mono.empty();
+        }
+
+        UUID loanId = repaymentEvent.getCommandId();
+
+        RepaymentEvent finalRepaymentEvent = repaymentEvent;
+        boolean notSuccessful = !ResponseCodes.RC_200.name().equalsIgnoreCase(finalRepaymentEvent.getStatus());
+        return sagaRepo.findByBusinessKey(loanId)
+                .flatMap(saga -> stepRepo.findBySagaIdAndStepName(saga.getId(), LOAN_REPAYMENT_STEP)
+                        .flatMap(sagaStep -> tx.execute(status -> {
+
+                            GenericRequest<DefaultRequestHeader, LoanRepaymentRequest> originalRequest;
+                            try {
+                                originalRequest = objectMapper.readValue(saga.getOriginalRequest(), new TypeReference<GenericRequest<DefaultRequestHeader, LoanRepaymentRequest>>() {});
+                            } catch (Exception e) {
+                                Helpers.log("", LogLevelEnum.ERROR, OperationNameEnum.KAFKA_CONSUMER, "Error parsing loan application request", e);
+                                throw new RuntimeException(e);
+                            }
+
+                            saga.setCurrentStep(NOTIFY_CUSTOMER_STEP);
+                            saga.setUpdatedAt(now());
+
+                            sagaStep.setStatus(COMPLETED_STATUS);
+
+                            String payloadString;
+                            OutBoxEvent outBoxEvent;
+                            try {
+                                if (notSuccessful) {
+                                    String message = finalRepaymentEvent.getMessage();
+                                    Helpers.log("loan.repayment.event", LogLevelEnum.INFO, OperationNameEnum.KAFKA_CONSUMER, "Sending notification event: " + message, null);
+                                    NotificationCommand notificationCommand = NotificationCommand.builder()
+                                            .commandId(loanId)
+                                            .types(List.of(NotificationTypeEnum.SMS, NotificationTypeEnum.EMAIL))
+                                            .template("REPAYMENT_PREVALIDATION_FAILED_TEMPLATE")
+                                            .principal(NotificationCommand.Recipient.builder().build())
+                                            .templateParamValues(Map.of("CUSTOMER_MESSAGE", message == null ? "Disbursement failed" : message))
+                                            .build();
+                                    payloadString = objectMapper.writeValueAsString(notificationCommand);
+                                    outBoxEvent = OutBoxEvent.builder()
+                                            .aggregateType(LOAN_AGGREGATE)
+                                            .aggregateId(loanId.toString())
+                                            .createdAt(now())
+                                            .isPublished(false)
+                                            .payload(payloadString)
+                                            .eventType(CommandsEnum.NOTIFY_EVENT.name())
+                                            .build();
+                                } else {
+                                    Helpers.log("loan.repayment.event", LogLevelEnum.INFO, OperationNameEnum.KAFKA_CONSUMER, "saving loan repayment command" + finalRepaymentEvent.getMessage(), null);
+
+
+                                    String message = finalRepaymentEvent.getMessage();
+                                    Helpers.log("loan.repayment.event", LogLevelEnum.INFO, OperationNameEnum.KAFKA_CONSUMER, "Sending notification event: " + message, null);
+                                    NotificationCommand notificationCommand = NotificationCommand.builder()
+                                            .commandId(loanId)
+                                            .types(List.of(NotificationTypeEnum.SMS, NotificationTypeEnum.EMAIL))
+                                            .template("REPAYMENT_SUCCESSFUL_TEMPLATE")
+                                            .principal(NotificationCommand.Recipient.builder().build())
+                                            .templateParamValues(Map.of("CUSTOMER_MESSAGE", message == null ? "Repayment success" : message, "amount", originalRequest.getBody().getAmount().toString()))
+                                            .build();
+                                    payloadString = objectMapper.writeValueAsString(notificationCommand);
+                                    outBoxEvent = OutBoxEvent.builder()
+                                            .aggregateType(LOAN_AGGREGATE)
+                                            .aggregateId(loanId.toString())
+                                            .createdAt(now())
+                                            .isPublished(false)
+                                            .payload(payloadString)
+                                            .eventType(CommandsEnum.NOTIFY_EVENT.name())
+                                            .build();
+
+                                        /*String message = finalRepaymentEvent.getMessage();
+                                        Helpers.log("loan.repayment.event", LogLevelEnum.INFO, OperationNameEnum.KAFKA_CONSUMER, "Sending notification event: " + message, null);
+
+
+                                        String message = finalRepaymentEvent.getMessage();
+                                        Helpers.log("loan.repayment.event", LogLevelEnum.INFO, OperationNameEnum.KAFKA_CONSUMER, "Sending notification event: " + message, null);
+                                        NotificationCommand notificationCommand = NotificationCommand.builder()
+                                                .commandId(loanId)
+                                                .types(List.of(NotificationTypeEnum.SMS, NotificationTypeEnum.EMAIL))
+                                                .template("REPAYMENT_FAILED_TEMPLATE")
+                                                .principal(NotificationCommand.Recipient.builder().build())
+                                                .templateParamValues(Map.of("CUSTOMER_MESSAGE", message == null ? "Disbursement failed" : message))
+                                                .build();
+                                        payloadString = objectMapper.writeValueAsString(notificationCommand);
+                                        outBoxEvent = OutBoxEvent.builder()
+                                                .aggregateType(LOAN_AGGREGATE)
+                                                .aggregateId(loanId.toString())
+                                                .createdAt(now())
+                                                .isPublished(false)
+                                                .payload(payloadString)
+                                                .eventType(CommandsEnum.NOTIFY_EVENT.name())
+                                                .build();
+                                    */
+                                }
+                            } catch (Exception e) {
+                                Helpers.log("", LogLevelEnum.ERROR, OperationNameEnum.KAFKA_CONSUMER, "Error creating notification command", e);
+                                throw new RuntimeException(e);
+                            }
+
+
+
+                            return stepRepo.save(sagaStep)
+                                    .then(stepRepo.save(nextStep(saga, LOAN_REPAYMENT_STEP)))
                                     .then(outboxRepo.save(outBoxEvent))
                                     .then(sagaRepo.save(saga));
 

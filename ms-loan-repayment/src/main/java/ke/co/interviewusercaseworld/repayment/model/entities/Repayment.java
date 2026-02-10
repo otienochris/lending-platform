@@ -8,22 +8,23 @@ import org.springframework.data.annotation.Id;
 import org.springframework.data.relational.core.mapping.Table;
 
 import java.math.BigDecimal;
-import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Data
 @Builder
 @AllArgsConstructor
 @NoArgsConstructor
-@Table(schema = "repayments", value = "repayment_schedule")
-public class RepaymentSchedule {
+
+@Table(schema = "repayments", value = "repayments")
+public class Repayment {
+
     @Id
-    private UUID scheduleId;
+    private UUID repaymentId;
     private UUID loanId;
-    private LocalDate dueDate;
-    private BigDecimal emiAmount;
-    private BigDecimal principalComponent;
-    private BigDecimal interestComponent;
-    private BigDecimal totalPaid;
+    private UUID scheduleId;
+    private BigDecimal amountPaid;
+    private LocalDateTime paymentDate;
+    private String paymentMode;
     private String status;
 }
