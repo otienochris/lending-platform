@@ -231,8 +231,8 @@ public class UserServiceImpl implements UserService, ReactiveUserDetailsService 
         String encoded = passwordEncoder.encode(user.getPassword());
         User entity = userMapper.toEntity(user);
         entity.setPassword(encoded);
-        entity.setEmailVerified(false);
-        entity.setEnabled(false);
+        entity.setEmailVerified(true);
+        entity.setEnabled(true);
         entity.setAccountNonExpired(true);
         entity.setAccountNonLocked(true);
         entity.setCredentialsNonExpired(true);

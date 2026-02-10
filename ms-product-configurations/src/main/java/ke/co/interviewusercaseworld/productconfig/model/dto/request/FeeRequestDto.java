@@ -1,5 +1,8 @@
 package ke.co.interviewusercaseworld.productconfig.model.dto.request;
 
+import ke.co.interviewusercaseworld.commons.enums.FeeApplicableAtEnum;
+import ke.co.interviewusercaseworld.commons.enums.FeeTypeEnum;
+import ke.co.interviewusercaseworld.commons.enums.FeeValueTypeEnum;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -12,6 +15,9 @@ import java.math.BigDecimal;
 @AllArgsConstructor
 @NoArgsConstructor
 public class FeeRequestDto {
-    private String feeType;
-    private BigDecimal feeAmount;
+    private FeeTypeEnum feeType;
+    private BigDecimal feeValue;
+    private FeeValueTypeEnum feeValueType;
+    private FeeApplicableAtEnum applicableAt;
+
 }

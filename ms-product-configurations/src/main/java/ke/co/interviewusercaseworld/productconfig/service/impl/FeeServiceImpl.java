@@ -4,6 +4,7 @@ import ke.co.interviewusercaseworld.commons.dto.requests.DefaultRequestHeader;
 import ke.co.interviewusercaseworld.commons.dto.requests.GenericRequest;
 import ke.co.interviewusercaseworld.commons.dto.responses.DefaultResponseHeader;
 import ke.co.interviewusercaseworld.commons.dto.responses.GenericResponse;
+import ke.co.interviewusercaseworld.commons.entities.product.LoanProduct;
 import ke.co.interviewusercaseworld.commons.enums.LogLevelEnum;
 import ke.co.interviewusercaseworld.commons.enums.OperationNameEnum;
 import ke.co.interviewusercaseworld.commons.utils.Helpers;
@@ -12,11 +13,13 @@ import ke.co.interviewusercaseworld.productconfig.model.dto.request.FeeRequestDt
 import ke.co.interviewusercaseworld.productconfig.model.dto.response.FeeResponseDto;
 import ke.co.interviewusercaseworld.productconfig.model.dto.response.LoanProductCreationResponseDto;
 import ke.co.interviewusercaseworld.productconfig.model.entity.ProductFee;
+import ke.co.interviewusercaseworld.productconfig.repository.LoanProductRepository;
 import ke.co.interviewusercaseworld.productconfig.repository.ProductFeeRepository;
 import ke.co.interviewusercaseworld.productconfig.service.FeeService;
 import ke.co.interviewusercaseworld.productconfig.service.LoanProductService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.util.List;
@@ -34,13 +37,16 @@ public class FeeServiceImpl implements FeeService {
     private final ProductFeeRepository productFeeRepository;
     private final LoanProductService productService;
     private final ProductFeeMapper productFeeMapper;
+    private final LoanProductRepository loanProductRepository;;
 
     @Override
-    public Mono<GenericResponse<DefaultResponseHeader, FeeResponseDto>> addFee(UUID productId, GenericRequest<DefaultRequestHeader, FeeRequestDto> request) {
-        return productService.getLoanProduct(productId, Map.of())
+    public Mono<GenericResponse<DefaultResponseHeader, List<FeeResponseDto>>> addFees(UUID productId, GenericRequest<DefaultRequestHeader, List<FeeRequestDto>> request) {
+        return loanProductRepository.findById(productId)
+                .onErrorResume(throwable -> Mono.just(LoanProduct.builder().build()))
+                .defaultIfEmpty(LoanProduct.builder().build())
                 .flatMap(res -> {
-                    if (!res.getHeader().getResponseCode().equals(RC_200)) {
-                        return Mono.just(GenericResponse.<DefaultResponseHeader, FeeResponseDto>builder()
+                    if (res.getId() == null) {
+                        return Mono.just(GenericResponse.<DefaultResponseHeader, List<FeeResponseDto>>builder()
                                 .header(DefaultResponseHeader.builder()
                                         .responseCode(RC_400)
                                         .responseRefId(request.getHeader().getRequestRefId())
@@ -50,41 +56,45 @@ public class FeeServiceImpl implements FeeService {
                                         .debugMessage("Loan product could not be found")
                                         .operation(request.getHeader().getOperation())
                                         .build())
+                                        .body(List.of())
                                 .build());
                     }
-                    LoanProductCreationResponseDto body = res.getBody();
-                    return productFeeRepository.existsByProductIdAndFeeType(body.getId(), request.getBody().getFeeType())
+
+                    return saveFees(request, res.getId())
+                            .flatMap(responses -> Mono.just(GenericResponse.<DefaultResponseHeader, List<FeeResponseDto>>builder()
+                                    .header(DefaultResponseHeader.builder()
+                                            .responseCode(RC_200)
+                                            .operation(request.getHeader().getOperation())
+                                            .customerMessage("Fees added successfully")
+                                            .debugMessage("Fees added successfully")
+                                            .responseRefId(request.getHeader().getRequestRefId())
+                                            .correlationId(request.getHeader().getCorrelationId())
+                                            .sourceSystem(request.getHeader().getSourceSystem())
+                                            .build())
+                                    .body(responses)
+                                    .build()));
+
+                });
+    }
+
+    private Mono<List<FeeResponseDto>> saveFees(GenericRequest<DefaultRequestHeader, List<FeeRequestDto>> request, UUID productId) {
+        Helpers.log("", LogLevelEnum.info,OperationNameEnum.LOAN_PRODUCT_CONFIGURATION, "Saving fees for product: " + productId, null);
+        return Flux.fromIterable(request.getBody())
+                .flatMap(feeRequestDto -> {
+                    return productFeeRepository.existsByProductIdAndFeeType(productId, feeRequestDto.getFeeType().name())
                             .switchIfEmpty(Mono.just(false))
                             .flatMap(exists -> {
                                 if (exists) {
-                                    return Mono.just(GenericResponse.<DefaultResponseHeader, FeeResponseDto>builder()
-                                            .header(DefaultResponseHeader.builder()
-                                                    .responseCode(RC_400)
-                                                    .responseRefId(request.getHeader().getRequestRefId())
-                                                    .correlationId(request.getHeader().getCorrelationId())
-                                                    .sourceSystem(request.getHeader().getSourceSystem())
-                                                    .customerMessage("Fee already exists")
-                                                    .debugMessage("Fee already exists")
-                                                    .build())
-                                            .build());
+                                    return Mono.empty();
                                 }
-                                return productFeeRepository.save(productFeeMapper.toEntity(request.getBody()))
-                                        .map(productFeeMapper::toDto)
-                                        .map(feeResponseDto -> {
-                                            Helpers.log(request.getHeader().getRequestRefId(), LogLevelEnum.info, OperationNameEnum.PRODUCT_CREATION, "Fee added successfully", null);
-                                            return GenericResponse.<DefaultResponseHeader, FeeResponseDto>builder()
-                                                    .header(DefaultResponseHeader.builder()
-                                                            .responseCode(RC_200)
-                                                            .responseRefId(request.getHeader().getRequestRefId())
-                                                            .correlationId(request.getHeader().getCorrelationId())
-                                                            .sourceSystem(request.getHeader().getSourceSystem())
-                                                            .build())
-                                                    .body(feeResponseDto)
-                                                    .build();
-                                        });
+                                ProductFee entity = productFeeMapper.toEntity(feeRequestDto);
+                                entity.setProductId(productId);
+                                return productFeeRepository.save(entity)
+                                        .map(productFeeMapper::toDto);
                             });
-                });
+                }).collectList();
     }
+
 
     @Override
     public Mono<GenericResponse<DefaultResponseHeader, List<FeeResponseDto>>> getFees(UUID productId, Map<String, String> headers) {

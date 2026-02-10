@@ -11,7 +11,7 @@ services:
     environment:
       POSTGRES_PASSWORD: apis
       POSTGRES_USER: apis
-      POSTGRES_MULTIPLE_DATABASES: "products,loans,crm,notification"
+      POSTGRES_DATABASES: "lending_platform"
     env_file:
       - .env
     networks:

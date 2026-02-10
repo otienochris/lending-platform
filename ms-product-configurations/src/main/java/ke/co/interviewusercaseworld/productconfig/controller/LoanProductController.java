@@ -91,20 +91,30 @@ public class LoanProductController {
                 });
     }
 
-    // -------- FEES --------
-
     @PostMapping("/{productId}/fees")
-    public Mono<ResponseEntity<GenericResponse<DefaultResponseHeader, FeeResponseDto>>> addFee(
+    public Mono<ResponseEntity<GenericResponse<DefaultResponseHeader, List<FeeResponseDto>>>> addFee(
             @PathVariable UUID productId,
-            @RequestBody GenericRequest<DefaultRequestHeader, FeeRequestDto> request
+            @RequestBody GenericRequest<DefaultRequestHeader, List<FeeRequestDto>> request
     ) {
-        return feeService.addFee(productId, request)
+        return feeService.addFees(productId, request)
                 .flatMap(response -> {
                     if (ResponseCodes.RC_200.equals(response.getHeader().getResponseCode())){
                         return Mono.just(ResponseEntity.ok(response));
                     } else {
                         return Mono.just(ResponseEntity.badRequest().body(response));
                     }
+                })
+                .onErrorResume(throwable -> {
+                    return Mono.just(ResponseEntity.badRequest().body(GenericResponse.<DefaultResponseHeader, List<FeeResponseDto>>builder()
+                                    .header(DefaultResponseHeader.builder()
+                                            .responseCode(ResponseCodes.RC_400)
+                                            .responseRefId(request.getHeader().getRequestRefId())
+                                            .correlationId(request.getHeader().getCorrelationId())
+                                            .sourceSystem(request.getHeader().getSourceSystem())
+                                            .customerMessage("Error adding fees")
+                                            .debugMessage("Error adding fees: " + throwable.getMessage())
+                                            .build())
+                            .build()));
                 });
     }
 

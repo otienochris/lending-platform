@@ -21,5 +21,7 @@ public class ProductFee {
 
     private UUID productId;
     private String feeType;
-    private BigDecimal feeAmount;
+    private BigDecimal feeValue;
+    private String feeValueType;
+    private String applicableAt;
 }

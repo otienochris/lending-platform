@@ -15,7 +15,7 @@ spring:
       value-serializer: org.apache.kafka.common.serialization.StringSerializer
   r2dbc:
     url: r2dbc:postgresql://localhost:5432
-    name: lending_platform
+    name: crm
     username: apis
     password: apis
     pool:

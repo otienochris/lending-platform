@@ -12,7 +12,9 @@ import java.math.BigDecimal;
 @AllArgsConstructor
 @NoArgsConstructor
 public class FeeResponseDto {
-    private String id;
+    private String feeId;
     private String feeType;
-    private BigDecimal feeAmount;
+    private BigDecimal feeValue;
+    private String feeValueType;
+    private String applicableAt;
 }

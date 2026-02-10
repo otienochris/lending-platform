@@ -30,6 +30,8 @@ public class LoanProduct {
     private String tenureOptionsType;
     private LocalDateTime effectiveFrom;
     private LocalDateTime effectiveTo;
+    private String currency;
+    private Boolean supportInstallments;
 
     private Boolean active;
 }

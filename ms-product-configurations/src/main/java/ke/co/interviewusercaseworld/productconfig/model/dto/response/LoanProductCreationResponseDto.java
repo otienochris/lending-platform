@@ -27,4 +27,6 @@ public class LoanProductCreationResponseDto {
     private TenureOptionsTypeEnum tenureOptionsType;
     private LocalDateTime effectiveFrom;
     private LocalDateTime effectiveTo;
+    private String currency;
+    private Boolean supportInstallments;
 }
