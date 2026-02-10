@@ -5,7 +5,7 @@ spring:
     config:
       enabled: false
   datasource:
-    url: jdbc:postgresql://localhost:5432/lending_platform
+    url: jdbc:postgresql://localhost:5432/crm
     username: apis
     password: apis
 eureka:
@@ -21,7 +21,10 @@ eureka:
 
   flyway:
     enabled: true
-    locations: classpath:db/migrations
+    locations: classpath:/db/migration
     encoding: UTF-8
     validate-on-migrate: true
     clean-disabled: true
+    create-schemas: true
+    table: lending_flyway_schema
+    baseline-on-migrate: true # never change to true

@@ -19,6 +19,8 @@ CREATE INDEX if not exists execution_time_idx ON tasks.scheduled_tasks (executio
 CREATE INDEX if not exists last_heartbeat_idx ON tasks.scheduled_tasks (last_heartbeat);
 CREATE INDEX if not exists priority_execution_time_idx on tasks.scheduled_tasks (priority desc, execution_time asc);
 
+
+
 ----- **************** orchestrator db ************-----------
 
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
@@ -44,7 +46,7 @@ CREATE INDEX if not exists idx_sagas_business_key
 -- --------------------
 -- Saga Steps
 -- --------------------
-
+--select * from orchestrator.saga_steps
 CREATE TABLE if not exists orchestrator.saga_steps (
                                                        step_id          UUID PRIMARY key DEFAULT uuid_generate_v4(),
     saga_id          UUID NOT NULL,
@@ -64,6 +66,7 @@ CREATE INDEX if not exists  idx_saga_steps_saga
 -- --------------------
 -- Outbox (Exactly-once)
 -- --------------------
+--select * from orchestrator.outbox_events
 CREATE TABLE if not exists orchestrator.outbox_events (
                                                           event_id         UUID PRIMARY key DEFAULT uuid_generate_v4(),
     aggregate_type   VARCHAR(50) NOT NULL,
@@ -140,7 +143,8 @@ create schema if not exists repayments;
 -- --------------------
 -- Loans
 -- --------------------
-
+-- select * from repayments.loans;
+-- update repayments.loans set status = 'OPEN' where status = 'PENDING';
 CREATE TABLE if not exists repayments.loans (
                                                 id					UUID PRIMARY key default uuid_generate_v4(),
     loan_id              UUID not null,
@@ -156,10 +160,14 @@ CREATE TABLE if not exists repayments.loans (
 -- --------------------
 -- Repayment Schedule
 -- --------------------
+-- select * from repayments.repayment_schedule
+-- update repayments.repayment_schedule set status = 'OPEN' where status = 'PENDING';
+-- drop  table repayments.repayment_schedule ;
 CREATE TABLE if not exists repayments.repayment_schedule (
                                                              schedule_id          UUID PRIMARY key default uuid_generate_v4(),
     loan_id              UUID NOT NULL,
     due_date             DATE NOT NULL,
+    total_paid			numeric(15,2) not null default 0,
     emi_amount           NUMERIC(15,2) NOT NULL,
     principal_component  NUMERIC(15,2) NOT NULL,
     interest_component   NUMERIC(15,2) NOT NULL,
@@ -172,9 +180,12 @@ CREATE index if not exists idx_schedule_loan
 -- --------------------
 -- Repayments
 -- --------------------
+-- select * from repayments.repayments;
+-- drop table repayments.repayments;
 CREATE TABLE if not exists repayments.repayments (
                                                      repayment_id         UUID PRIMARY key default uuid_generate_v4(),
     loan_id              UUID NOT NULL,
+    schedule_id          UUID not null,
     amount_paid          NUMERIC(15,2) NOT NULL,
     payment_date         TIMESTAMP NOT NULL,
     payment_mode         VARCHAR(50),
@@ -215,7 +226,7 @@ create schema if not exists product_configs;
 -- --------------------
 -- Loan Products
 -- --------------------
-
+-- select * from product_configs.outbox_events;
 CREATE TABLE if not exists product_configs.outbox_events (
                                                              event_id         UUID PRIMARY key DEFAULT uuid_generate_v4(),
     aggregate_type   VARCHAR(50) NOT NULL,
@@ -231,6 +242,9 @@ CREATE INDEX if not exists idx_repayment_outbox_unpublished
 
 
 -- Create the loan_products table
+
+-- drop table product_configs.loan_products;
+-- select * from product_configs.loan_products
 CREATE TABLE IF NOT EXISTS product_configs.loan_products (
     -- Primary key with UUID
                                                              id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -257,6 +271,9 @@ CREATE TABLE IF NOT EXISTS product_configs.loan_products (
     -- Status flag with index for active products
     active BOOLEAN NOT NULL DEFAULT true,
 
+    currency varchar(50) not null default 'KES',
+    support_installments boolean not null default true,
+
     -- Audit columns (highly recommended)
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
@@ -275,11 +292,15 @@ CREATE TABLE IF NOT EXISTS product_configs.loan_products (
 -- --------------------
 -- Fees
 -- --------------------
+
+-- select * from product_configs.fees
 CREATE TABLE if not exists product_configs.fees (
-                                                    fee_id           UUID PRIMARY KEY,
-                                                    product_id       UUID NOT NULL,
-                                                    fee_type         VARCHAR(50) NOT NULL,
-    fee_amount       NUMERIC(15,2) NOT NULL
+                                                    fee_id           UUID PRIMARY key DEFAULT uuid_generate_v4(),
+    product_id       UUID NOT NULL,
+    fee_type         VARCHAR(50) NOT NULL,
+    fee_value_type   VARCHAR(50) NOT NULL,
+    fee_value       NUMERIC(15,2) NOT null,
+    applicable_at     varchar(255) not null
     );
 
 CREATE INDEX if not exists idx_fees_product
@@ -416,6 +437,9 @@ CREATE INDEX if not exists idx_role_permissions_permission ON auth.role_permissi
 -- =============================================
 -- 4. USERS TABLE (auth_users as per your entity)
 -- =============================================
+-- truncate table auth.auth_users cascade;
+-- select * from auth.auth_users;
+-- update auth.auth_users set loan_limit = 1500
 CREATE TABLE IF NOT EXISTS auth.auth_users (
                                                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     username VARCHAR(50) NOT NULL UNIQUE,
@@ -453,11 +477,14 @@ CREATE TABLE IF NOT EXISTS auth.auth_users (
     created_by VARCHAR(100),
     updated_by VARCHAR(100),
     msisdn varchar(255) not null,
+    loan_limit NUMERIC(15,2) default 500,
     is_blacklisted varchar(255) not null,
     -- Constraints
     CONSTRAINT chk_email CHECK (email ~* '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$'),
     CONSTRAINT chk_username_length CHECK (LENGTH(username) >= 3)
     );
+
+-- alter table auth.auth_users add column loan_limit NUMERIC(15,2) default 500;
 
 
 -- Indexes for user lookups
