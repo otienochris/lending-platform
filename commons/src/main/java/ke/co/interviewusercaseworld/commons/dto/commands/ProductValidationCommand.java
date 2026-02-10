@@ -1,4 +1,4 @@
-package ke.co.interviewusercaseworld.msorchestrator.model.dto.request.events;
+package ke.co.interviewusercaseworld.commons.dto.commands;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -11,7 +11,7 @@ import java.util.UUID;
 @Builder
 @AllArgsConstructor
 @NoArgsConstructor
-public class UserValidationEvent {
+public class ProductValidationCommand {
     private UUID commandId;
-    private UUID userId;
+    private UUID productId;
 }

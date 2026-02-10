@@ -1,6 +1,7 @@
 package ke.co.interviewusercaseworld.msorchestrator.service.impl;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import ke.co.interviewusercaseworld.commons.dto.commands.ProductValidationCommand;
 import ke.co.interviewusercaseworld.commons.dto.requests.DefaultRequestHeader;
 import ke.co.interviewusercaseworld.commons.dto.requests.GenericRequest;
 import ke.co.interviewusercaseworld.commons.dto.responses.DefaultResponseHeader;
@@ -26,6 +27,7 @@ import org.springframework.transaction.reactive.TransactionalOperator;
 import reactor.core.publisher.Mono;
 
 import java.time.LocalDateTime;
+import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -59,6 +61,7 @@ public class LoanServiceImpl implements LoanService {
                 .businessKey(loanId.toString())
                 .status("STARTED")
                 .currentStep("PRODUCT_VALIDATION")
+                .originalRequest(serialize(request))
                 .build();
 
         SagaStep sagaStep = SagaStep.builder()
@@ -66,12 +69,16 @@ public class LoanServiceImpl implements LoanService {
                 .status("REQUESTED")
                 .build();
 
+        ProductValidationCommand productValidationCommand = ProductValidationCommand.builder()
+                .productId(request.getBody().getProductId())
+                .commandId(loanId)
+                .build();
         OutBoxEvent outBoxEvent = OutBoxEvent.builder()
                 .aggregateType("LOAN")
                 .aggregateId(loanId.toString())
                 .createdAt(LocalDateTime.now())
                 .isPublished(false)
-                .payload(serialize(request))
+                .payload(serialize(productValidationCommand))
                 .eventType(CommandsEnum.PRODUCT_VALIDATION_COMMAND.name())
                 .build();
 

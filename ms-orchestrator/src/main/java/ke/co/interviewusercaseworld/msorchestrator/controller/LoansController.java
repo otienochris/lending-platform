@@ -30,9 +30,6 @@ import static ke.co.interviewusercaseworld.commons.utils.Helpers.getDefaultReque
 @RequiredArgsConstructor
 public class LoansController {
 
-    private final WebClient webClient;
-    private final LoanProductService loanProductService;
-    private final SecurityService securityService;
     private final LoanService loanService;
 
     @PostMapping

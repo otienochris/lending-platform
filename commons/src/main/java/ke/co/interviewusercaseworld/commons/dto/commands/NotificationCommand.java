@@ -1,4 +1,4 @@
-package ke.co.interviewusercaseworld.msorchestrator.model.dto.request.commands;
+package ke.co.interviewusercaseworld.commons.dto.commands;
 
 import ke.co.interviewusercaseworld.commons.enums.InterestRateTypeEnum;
 import ke.co.interviewusercaseworld.commons.enums.NotificationTypeEnum;

@@ -31,6 +31,7 @@ public class Saga {
     private String status;
 
     private String currentStep;
+    private String originalRequest;
 
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

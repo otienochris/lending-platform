@@ -5,14 +5,17 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.math.BigDecimal;
+import java.util.UUID;
+
 @Data
 @Builder
 @AllArgsConstructor
 @NoArgsConstructor
 public class LoanApplicationRequest {
-    private String loanAmount;
-    private String productId;
-    private String customerId;
+    private BigDecimal loanAmount;
+    private UUID productId;
+    private UUID customerId;
     private String loanPurpose;
-    private String tenure;
+    private Integer tenure;
 }

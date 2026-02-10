@@ -30,15 +30,6 @@ public class AppProperties {
         private KafkaConfigs kafkaConfigs;
     }
 
-    @Data
-    @Builder
-    @AllArgsConstructor
-    @NoArgsConstructor
-    public static class KafkaConfigs {
-
-        private Map<CommandsEnum, String> topicsForCommand;
-
-    }
 
     @Data
     @Builder
@@ -48,6 +39,17 @@ public class AppProperties {
 
         private SecurityConfigSpec securityConfigSpec;
         private Map<String, ServiceSetup> externalMicroServices;
+        private KafkaConfigs kafkaConfigs;
+
+    }
+
+    @Data
+    @Builder
+    @AllArgsConstructor
+    @NoArgsConstructor
+    public static class KafkaConfigs {
+
+        private Map<CommandsEnum, String> topicsForCommand;
 
     }
 

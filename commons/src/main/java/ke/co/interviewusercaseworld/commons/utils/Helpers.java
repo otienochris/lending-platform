@@ -9,6 +9,7 @@ import org.springframework.stereotype.Component;
 
 import java.net.URI;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 
 @Component
@@ -71,25 +72,26 @@ public class Helpers {
     public static DefaultRequestHeader getDefaultRequestHeaderObject(Map<String, String> headers) {
         String correlationId = headers.getOrDefault("X-Correlation-ID", "");
         UUID uuidCorrelation = null;
-        if (!correlationId.isEmpty()) {
+        if (!correlationId.isBlank()) {
             try{
-                uuidCorrelation = UUID.fromString(correlationId);
+                UUID.fromString(correlationId);
             } catch (Exception e) {
                 Helpers.log("", LogLevelEnum.warn, OperationNameEnum.UNSPECIFIED, "Invalid correlation id", e);
             } finally {
                 uuidCorrelation = UUID.randomUUID();
             }
-
+        } else {
+            uuidCorrelation = UUID.randomUUID();
         }
         String requestRefId = headers.getOrDefault("X-Request-Ref-Id", "");
         String sourceSystem = headers.getOrDefault("X-Source-System", "");
         String operation = headers.getOrDefault("X-Operation", "");
         String token = headers.getOrDefault("Authorization", "");
         return DefaultRequestHeader.builder()
-                .requestRefId(requestRefId)
+                .requestRefId(requestRefId.isBlank() ? Objects.requireNonNull(uuidCorrelation).toString() : requestRefId)
                 .correlationId(uuidCorrelation)
                 .sourceSystem(sourceSystem)
-                .operation(OperationNameEnum.valueOf(operation))
+                .operation(operation.isBlank() ? OperationNameEnum.UNSPECIFIED: OperationNameEnum.valueOf(operation))
                 .token(token)
                 .build();
     }

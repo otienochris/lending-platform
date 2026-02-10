@@ -1,10 +1,18 @@
 package ke.co.interviewusercaseworld.msorchestrator.consumers;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import ke.co.interviewusercaseworld.commons.dto.requests.DefaultRequestHeader;
+import ke.co.interviewusercaseworld.commons.dto.requests.GenericRequest;
 import ke.co.interviewusercaseworld.commons.enums.CommandsEnum;
 import ke.co.interviewusercaseworld.commons.enums.LogLevelEnum;
+import ke.co.interviewusercaseworld.commons.enums.NotificationTypeEnum;
 import ke.co.interviewusercaseworld.commons.enums.OperationNameEnum;
 import ke.co.interviewusercaseworld.commons.utils.Helpers;
-import ke.co.interviewusercaseworld.msorchestrator.model.dto.request.events.ProductValidationEvent;
+import ke.co.interviewusercaseworld.msorchestrator.model.dto.request.LoanApplicationRequest;
+import ke.co.interviewusercaseworld.msorchestrator.model.dto.request.LoanRepaymentRequest;
+import ke.co.interviewusercaseworld.msorchestrator.model.dto.request.commands.NotificationCommand;
+import ke.co.interviewusercaseworld.msorchestrator.model.dto.request.commands.UserValidationCommand;
+import ke.co.interviewusercaseworld.msorchestrator.model.dto.request.events.*;
 import ke.co.interviewusercaseworld.msorchestrator.model.entities.OutBoxEvent;
 import ke.co.interviewusercaseworld.msorchestrator.model.entities.Saga;
 import ke.co.interviewusercaseworld.msorchestrator.model.entities.SagaStep;
@@ -12,14 +20,14 @@ import ke.co.interviewusercaseworld.msorchestrator.repository.OutBoxEventReposit
 import ke.co.interviewusercaseworld.msorchestrator.repository.SagaRepository;
 import ke.co.interviewusercaseworld.msorchestrator.repository.SagaStepRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.context.event.EventListener;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.reactive.TransactionalOperator;
 import reactor.core.publisher.Mono;
-import tools.jackson.databind.ObjectMapper;
+import tools.jackson.core.type.TypeReference;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -29,63 +37,296 @@ import static java.time.LocalDateTime.now;
 @RequiredArgsConstructor
 public class EventListeners {
 
+    public static final String USER_VALIDATION_STEP = "USER_VALIDATION";
+    public static final String PRODUCT_VALIDATION_STEP = "PRODUCT_VALIDATION";
+    public static final String LOAN_AGGREGATE = "LOAN";
+    public static final String LOAN_DISBURSEMENT_STEP = "LOAN_DISBURSEMENT";
+    public static final String COMPLETED_STATUS = "COMPLETED";
+    public static final String LOAN_REPAYMENT_STEP = "LOAN_REPAYMENT";
+    public static final String NOTIFY_CUSTOMER_STEP = "NOTIFY_CUSTOMER";
     private final ObjectMapper objectMapper;
     private final SagaRepository sagaRepo;
     private final TransactionalOperator tx;
     private final SagaStepRepository stepRepo;
     private final OutBoxEventRepository outboxRepo;
 
-
     @KafkaListener(topics = {"product.validation.event"}, groupId = "orchestrator")
-    public Mono<Void> onDisbursementEvent(String payload){
-        Helpers.log("", LogLevelEnum.INFO, OperationNameEnum.KAFKA_CONSUMER, "Received message from kafka: " + payload, null);
-        ProductValidationEvent productValidationEvent = objectMapper.readValue(payload, ProductValidationEvent.class);
+    public Mono<Void> onProductValidationEvent(String payload) {
+        Helpers.log("", LogLevelEnum.INFO, OperationNameEnum.KAFKA_CONSUMER, "Received message from product.validation.event: " + payload, null);
 
-        UUID loanId = productValidationEvent.getLoanId();
+        ProductValidationEvent productValidationEvent;
+        try{
+            productValidationEvent = objectMapper.readValue(payload, ProductValidationEvent.class);
+            Helpers.log("product.validation.event", LogLevelEnum.INFO, OperationNameEnum.KAFKA_CONSUMER, "Parsed product.validation.event", null);
+        } catch (Exception e){
+            Helpers.log("", LogLevelEnum.ERROR, OperationNameEnum.KAFKA_CONSUMER, "Error parsing product.validation.event", e);
+            return Mono.empty();
+        }
+
+        UUID loanId = productValidationEvent.getCommandId();
         return sagaRepo.findByBusinessKey(loanId)
-                .flatMap(saga -> stepRepo.findBySagaIdAndStepName(saga.getId(),"PRODUCT_VALIDATION")
+                .flatMap(saga -> stepRepo.findBySagaIdAndStepName(saga.getId(), PRODUCT_VALIDATION_STEP)
                         .flatMap(sagaStep -> tx.execute(status -> {
-                                    String currentStage = CommandsEnum.PRODUCT_VALIDATION_COMMAND.name();
+
+                            GenericRequest<DefaultRequestHeader, LoanApplicationRequest> originalRequest;
+                            String payloadString;
+                            try {
+
+                                String sagaOriginalRequest = saga.getOriginalRequest();
+
+                                originalRequest = objectMapper.readValue(sagaOriginalRequest, new com.fasterxml.jackson.core.type.TypeReference<GenericRequest<DefaultRequestHeader, LoanApplicationRequest>>() {
+                                });
+
+                                UserValidationCommand command = UserValidationCommand.builder()
+                                        .userId(originalRequest.getBody().getCustomerId())
+                                        .commandId(loanId)
+                                        .build();
+
+                                payloadString = objectMapper.writeValueAsString(command);
+                            } catch (Exception e) {
+                                Helpers.log("", LogLevelEnum.ERROR, OperationNameEnum.KAFKA_CONSUMER, "Error creating user validation command", e);
+                                throw new RuntimeException(e);
+                            }
+                            saga.setCurrentStep(USER_VALIDATION_STEP);
+                            saga.setUpdatedAt(now());
+
+                            sagaStep.setStatus(COMPLETED_STATUS);
 
 
-                                    saga.setCurrentStep(currentStage);
-                                    saga.setUpdatedAt(now());
+                            OutBoxEvent outBoxEvent = OutBoxEvent.builder()
+                                    .aggregateType(LOAN_AGGREGATE)
+                                    .aggregateId(loanId.toString())
+                                    .createdAt(now())
+                                    .isPublished(false)
+                                    .payload(payloadString)
+                                    .eventType(CommandsEnum.USER_VALIDATION_COMMAND.name())
+                                    .build();
 
-                                    sagaStep.setStatus("COMPLETED");
-
-                                    Map<String, UUID> request = Map.of("userId", loanId);
-                                    OutBoxEvent outBoxEvent = OutBoxEvent.builder()
-                                            .aggregateType("LOAN")
-                                            .aggregateId(loanId.toString())
-                                            .createdAt(LocalDateTime.now())
-                                            .isPublished(false)
-                                            .payload(objectMapper.writeValueAsString(request))
-                                            .eventType(currentStage)
-                                            .build();
-
-                                    return stepRepo.save(sagaStep)
-                                            .then(stepRepo.save(nextStep(saga, CommandsEnum.USER_VALIDATION_COMMAND.name())))
-                                            .then(outboxRepo.save(outBoxEvent))
-                                            .then(sagaRepo.save(saga));
-                                }).then())
+                            return stepRepo.save(sagaStep)
+                                    .then(stepRepo.save(nextStep(saga, USER_VALIDATION_STEP)))
+                                    .then(outboxRepo.save(outBoxEvent))
+                                    .then(sagaRepo.save(saga))
+                                    .doOnError(throwable -> Helpers.log("product.validation.event", LogLevelEnum.ERROR, OperationNameEnum.KAFKA_CONSUMER, "Error saving saga", new RuntimeException(throwable)));
+                        }).then())
                 );
     }
 
-    private SagaStep completedStep(SagaStep sagaStep) {
-        sagaStep.setStatus("COMPLETED");
-        return sagaStep;
+    @KafkaListener(topics = {"user.validation.event"}, groupId = "orchestrator")
+    public Mono<Void> onUserValidationEvent(String payload) {
+        Helpers.log("", LogLevelEnum.INFO, OperationNameEnum.KAFKA_CONSUMER, "Received message from user.validation.event", null);
+
+        UserValidationEvent userValidationEvent;
+
+        try{
+            userValidationEvent = objectMapper.readValue(payload, UserValidationEvent.class);
+            Helpers.log("user.validation.event", LogLevelEnum.INFO, OperationNameEnum.KAFKA_CONSUMER, "Parsed user.validation.event", null);
+        } catch (Exception e){
+            Helpers.log("", LogLevelEnum.ERROR, OperationNameEnum.KAFKA_CONSUMER, "Error parsing user.validation.event", e);
+            return Mono.empty();
+        }
+
+        UUID loanId = userValidationEvent.getCommandId();
+
+        return sagaRepo.findByBusinessKey(loanId)
+                .flatMap(saga -> stepRepo.findBySagaIdAndStepName(saga.getId(), USER_VALIDATION_STEP)
+                        .flatMap(sagaStep -> tx.execute(status -> {
+
+                            GenericRequest<DefaultRequestHeader, LoanApplicationRequest> originalRequest;
+                            String payloadString;
+
+                            try {
+                                originalRequest = objectMapper.readValue(saga.getOriginalRequest(), new com.fasterxml.jackson.core.type.TypeReference<GenericRequest<DefaultRequestHeader, LoanApplicationRequest>>() {});
+                                LoanApplicationRequest command = originalRequest.getBody();
+                                payloadString = objectMapper.writeValueAsString(command);
+                                Helpers.log("user.validation.event", LogLevelEnum.INFO, OperationNameEnum.KAFKA_CONSUMER, "Parsed user.validation.event", null);
+                            } catch (Exception e) {
+                                Helpers.log("", LogLevelEnum.ERROR, OperationNameEnum.KAFKA_CONSUMER, "Error creating loan application command", e);
+                                throw new RuntimeException(e);
+                            }
+
+                            saga.setCurrentStep(LOAN_DISBURSEMENT_STEP);
+                            saga.setUpdatedAt(now());
+
+                            sagaStep.setStatus(COMPLETED_STATUS);
+
+
+                            OutBoxEvent outBoxEvent = OutBoxEvent.builder()
+                                    .aggregateType(LOAN_AGGREGATE)
+                                    .aggregateId(loanId.toString())
+                                    .createdAt(LocalDateTime.now())
+                                    .isPublished(false)
+                                    .payload(payloadString)
+                                    .eventType(CommandsEnum.DISBURSE_COMMAND.name())
+                                    .build();
+
+                            return stepRepo.save(sagaStep)
+                                    .then(stepRepo.save(nextStep(saga, LOAN_DISBURSEMENT_STEP)))
+                                    .then(outboxRepo.save(outBoxEvent))
+                                    .then(sagaRepo.save(saga));
+
+                        }).then()));
+
+    }
+
+    @KafkaListener(topics = {"loan.disbursement.event"}, groupId = "orchestrator")
+    public Mono<Void> onDisbursementEvent(String payload) {
+        Helpers.log("", LogLevelEnum.INFO, OperationNameEnum.KAFKA_CONSUMER, "Received message from loan.disbursement.event", null);
+        DisbursementEvent disbursementEvent;
+        try {
+            disbursementEvent = objectMapper.readValue(payload, DisbursementEvent.class);
+        } catch (Exception e) {
+            Helpers.log("", LogLevelEnum.ERROR, OperationNameEnum.KAFKA_CONSUMER, "Error parsing loan.disbursement.event", e);
+            return Mono.empty();
+        }
+
+        UUID loanId = disbursementEvent.getCommandId();
+
+        return sagaRepo.findByBusinessKey(loanId)
+                .flatMap(saga -> stepRepo.findBySagaIdAndStepName(saga.getId(), LOAN_DISBURSEMENT_STEP)
+                        .flatMap(sagaStep -> tx.execute(status -> {
+
+                            GenericRequest<DefaultRequestHeader, LoanApplicationRequest> originalRequest;
+                            String payloadString;
+                            try {
+                                originalRequest = objectMapper.readValue(saga.getOriginalRequest(), new com.fasterxml.jackson.core.type.TypeReference<GenericRequest<DefaultRequestHeader, LoanApplicationRequest>>() {});
+                                LoanRepaymentRequest command = LoanRepaymentRequest.builder()
+                                        .totalLoanAmount(disbursementEvent.getTotalAmountToBePaid())
+                                        .loanId(loanId)
+                                        .dueDate(disbursementEvent.getDueDate())
+                                        .installments(disbursementEvent.getInstallments())
+                                        .customerId(originalRequest.getBody().getCustomerId())
+                                        .build();
+
+                                payloadString = objectMapper.writeValueAsString(command);
+                            } catch (Exception e) {
+                                Helpers.log("", LogLevelEnum.ERROR, OperationNameEnum.KAFKA_CONSUMER, "Error creating loan repayment command", e);
+                                throw new RuntimeException(e);
+                            }
+
+                            saga.setCurrentStep(LOAN_REPAYMENT_STEP);
+                            saga.setUpdatedAt(now());
+
+                            sagaStep.setStatus(COMPLETED_STATUS);
+
+
+                            OutBoxEvent outBoxEvent = OutBoxEvent.builder()
+                                    .aggregateType(LOAN_AGGREGATE)
+                                    .aggregateId(loanId.toString())
+                                    .createdAt(now())
+                                    .isPublished(false)
+                                    .payload(payloadString)
+                                    .eventType(CommandsEnum.REPAYMENT_COMMAND.name())
+                                    .build();
+
+                            return stepRepo.save(sagaStep)
+                                    .then(stepRepo.save(nextStep(saga, LOAN_REPAYMENT_STEP)))
+                                    .then(outboxRepo.save(outBoxEvent))
+                                    .then(sagaRepo.save(saga));
+
+                        }).then()));
+
+    }
+
+    @KafkaListener(topics = {"loan.repayment.event"}, groupId = "orchestrator")
+    public Mono<Void> onRepaymentEvent(String payload) {
+        Helpers.log("", LogLevelEnum.INFO, OperationNameEnum.KAFKA_CONSUMER, "Received message from loan.repayment.event", null);
+        RepaymentEvent repaymentEvent;
+        try {
+            repaymentEvent = objectMapper.readValue(payload, RepaymentEvent.class);
+        } catch (Exception e) {
+            Helpers.log("", LogLevelEnum.ERROR, OperationNameEnum.KAFKA_CONSUMER, "Error parsing loan.repayment.event", e);
+            return Mono.empty();
+        }
+
+        UUID loanId = repaymentEvent.getCommandId();
+
+        return sagaRepo.findByBusinessKey(loanId)
+                .flatMap(saga -> stepRepo.findBySagaIdAndStepName(saga.getId(), LOAN_REPAYMENT_STEP)
+                        .flatMap(sagaStep -> tx.execute(status -> {
+
+                            saga.setCurrentStep(NOTIFY_CUSTOMER_STEP);
+                            saga.setUpdatedAt(now());
+
+                            sagaStep.setStatus(COMPLETED_STATUS);
+
+                            NotificationCommand command = NotificationCommand.builder()
+                                    .commandId(loanId)
+                                    .template("SUCCESSFUL_LOAN_DISBURSEMENT")
+                                    .types(List.of(NotificationTypeEnum.SMS, NotificationTypeEnum.EMAIL))
+                                    .templateParamValues(Map.of(
+                                            "AMOUNT", repaymentEvent.getTotalLoanAmount(),
+                                            "DUE_DATE", repaymentEvent.getDueDate(),
+                                            "TOTAL_INTEREST", repaymentEvent.getTotalInterest()))
+                                    .principal(NotificationCommand.Recipient.builder()
+                                            .msisdn("254742887480")
+                                            .to(List.of("ohtischris@gmail.com"))
+                                            .build())
+                                    .build();
+
+                            String payloadString;
+                            try {
+                                payloadString = objectMapper.writeValueAsString(command);
+                            } catch (Exception e) {
+                                Helpers.log("", LogLevelEnum.ERROR, OperationNameEnum.KAFKA_CONSUMER, "Error creating notification command", e);
+                                throw new RuntimeException(e);
+                            }
+
+                            OutBoxEvent outBoxEvent = OutBoxEvent.builder()
+                                    .aggregateType(LOAN_AGGREGATE)
+                                    .aggregateId(loanId.toString())
+                                    .createdAt(now())
+                                    .isPublished(false)
+                                    .payload(payloadString)
+                                    .eventType(CommandsEnum.NOTIFY_COMMAND.name())
+                                    .build();
+
+                            return stepRepo.save(sagaStep)
+                                    .then(stepRepo.save(nextStep(saga, NOTIFY_CUSTOMER_STEP)))
+                                    .then(outboxRepo.save(outBoxEvent))
+                                    .then(sagaRepo.save(saga));
+
+                        }).then()));
+
+    }
+
+    @KafkaListener(topics = {"notification.event"}, groupId = "orchestrator")
+    public Mono<Void> onNotificationEvent(String payload) {
+        Helpers.log("", LogLevelEnum.INFO, OperationNameEnum.KAFKA_CONSUMER, "Received message from notification.event", null);
+        NotificationEvent repaymentEvent;
+        try {
+            repaymentEvent = objectMapper.readValue(payload, NotificationEvent.class);
+            Helpers.log("notification.event", LogLevelEnum.INFO, OperationNameEnum.KAFKA_CONSUMER, "Parsed notification.event", null);
+        } catch (Exception e) {
+            Helpers.log("", LogLevelEnum.ERROR, OperationNameEnum.KAFKA_CONSUMER, "Error parsing notification.event", e);
+            return Mono.empty();
+        }
+
+        UUID loanId = repaymentEvent.getCommandId();
+
+        return sagaRepo.findByBusinessKey(loanId)
+                .flatMap(saga -> stepRepo.findBySagaIdAndStepName(saga.getId(), NOTIFY_CUSTOMER_STEP)
+                        .flatMap(sagaStep -> tx.execute(status -> {
+
+                            saga.setCurrentStep("COMPLETED");
+                            saga.setUpdatedAt(now());
+                            sagaStep.setStatus(COMPLETED_STATUS);
+
+                            return stepRepo.save(sagaStep)
+                                    .then(sagaRepo.save(saga));
+
+                        }).then()));
+
     }
 
     private SagaStep nextStep(Saga saga, String step) {
-        return new SagaStep(
-                null,
-                saga.getId(),
-                step,
-                "REQUESTED",
-                0,
-                null,
-                now()
-        );
+        Helpers.log("", LogLevelEnum.INFO, OperationNameEnum.KAFKA_CONSUMER, "Creating next step for saga: " + saga.getId(), null);
+        return SagaStep.builder()
+                .status("REQUESTED")
+                .stepName(step)
+                .sagaId(saga.getId())
+                .retryCount(0)
+                .executedAt(now())
+                .build();
     }
 
 

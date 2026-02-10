@@ -4,6 +4,16 @@ spring:
   cloud:
     config:
       enabled: false
+  kafka:
+    bootstrap-servers: localhost:9092
+    consumer:
+      group-id: product-configurations
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
   r2dbc:
     url: r2dbc:postgresql://localhost:5432
     name: lending_platform
@@ -51,6 +61,10 @@ logging:
 app:
   service-properties:
     product-configuration:
+      kafka-configs:
+        topics-for-command:
+          PRODUCT_VALIDATION_COMMAND: "product.validation.command"
+          PRODUCT_VALIDATION_EVENT: "product.validation.event"
       securityConfigSpec:
         whitelistedPaths:
 

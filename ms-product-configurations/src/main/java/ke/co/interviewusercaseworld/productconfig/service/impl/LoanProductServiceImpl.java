@@ -142,6 +142,7 @@ public class LoanProductServiceImpl implements LoanProductService {
     @Override
     public Mono<GenericResponse<DefaultResponseHeader, LoanProductCreationResponseDto>> getLoanProduct(UUID loanProductId, Map<String, String> headers) {
         DefaultRequestHeader headerObject = getDefaultRequestHeaderObject(headers);
+        Helpers.log(headerObject.getRequestRefId(), LogLevelEnum.info, headerObject.getOperation(), "Getting loan product", null);
         return loanProductRepository.findById(loanProductId)
                 .switchIfEmpty(Mono.just(LoanProduct.builder().build()))
                 .onErrorResume(throwable -> {

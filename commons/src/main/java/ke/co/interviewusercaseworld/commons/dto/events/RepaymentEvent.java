@@ -1,4 +1,4 @@
-package ke.co.interviewusercaseworld.msorchestrator.model.dto.request.events;
+package ke.co.interviewusercaseworld.commons.dto.events;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;

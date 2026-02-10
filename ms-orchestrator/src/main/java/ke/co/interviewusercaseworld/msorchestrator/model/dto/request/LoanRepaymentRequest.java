@@ -1,4 +1,4 @@
-package ke.co.interviewusercaseworld.msorchestrator.model.dto.request.events;
+package ke.co.interviewusercaseworld.msorchestrator.model.dto.request;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -13,13 +13,10 @@ import java.util.UUID;
 @Builder
 @AllArgsConstructor
 @NoArgsConstructor
-public class RepaymentEvent {
-    private UUID commandId;
-    private String status;
-    private String message;
-    private String referenceNumber;
+public class LoanRepaymentRequest {
+    private UUID loanId;
     private BigDecimal totalLoanAmount;
-    private BigDecimal totalInterest;
-    private String scheduleType;
+    private Integer installments;
     private LocalDateTime dueDate;
+    private UUID customerId;
 }
