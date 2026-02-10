@@ -20,6 +20,17 @@ public class AppProperties {
     private ProductConfigsProperties productConfiguration;
     private OrchestratorProperties orchestratorProperties;
     private AuthServerProperties authServerProperties;
+    private LoanDisbursementProperties loanDisbursementProperties;
+
+    @Data
+    @Builder
+    @AllArgsConstructor
+    @NoArgsConstructor
+    public static class LoanDisbursementProperties {
+        private SecurityConfigSpec securityConfigSpec;
+        private Map<String, ServiceSetup> externalMicroServices;
+        private KafkaConfigs kafkaConfigs;
+    }
 
     @Data
     @Builder

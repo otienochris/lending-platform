@@ -1,4 +1,4 @@
-package ke.co.interviewusercaseworld.msorchestrator.model.dto.request;
+package ke.co.interviewusercaseworld.disbursement.model.dto.requests;
 
 import ke.co.interviewusercaseworld.commons.enums.WalletTypeEnum;
 import lombok.AllArgsConstructor;
@@ -13,13 +13,12 @@ import java.util.UUID;
 @Builder
 @AllArgsConstructor
 @NoArgsConstructor
-public class LoanApplicationRequest {
-    private BigDecimal loanAmount;
+public class DisbursementRequest {
     private UUID productId;
+    private UUID loanId;
+    private BigDecimal amount;
     private UUID customerId;
-    private String loanPurpose;
-    private Integer tenure;
-    @Builder.Default
-    private WalletTypeEnum walletType = WalletTypeEnum.MobileMoney;
     private String walletId;
+    @Builder.Default
+    private WalletTypeEnum destinationWallet = WalletTypeEnum.MobileMoney;
 }

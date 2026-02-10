@@ -1,6 +1,8 @@
 package ke.co.interviewusercaseworld.msorchestrator.consumers;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import ke.co.interviewusercaseworld.commons.dto.commands.DisbursementCommand;
 import ke.co.interviewusercaseworld.commons.dto.requests.DefaultRequestHeader;
 import ke.co.interviewusercaseworld.commons.dto.requests.GenericRequest;
 import ke.co.interviewusercaseworld.commons.enums.CommandsEnum;
@@ -24,7 +26,6 @@ import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.reactive.TransactionalOperator;
 import reactor.core.publisher.Mono;
-import tools.jackson.core.type.TypeReference;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -135,8 +136,18 @@ public class EventListeners {
                             String payloadString;
 
                             try {
-                                originalRequest = objectMapper.readValue(saga.getOriginalRequest(), new com.fasterxml.jackson.core.type.TypeReference<GenericRequest<DefaultRequestHeader, LoanApplicationRequest>>() {});
-                                LoanApplicationRequest command = originalRequest.getBody();
+                                originalRequest = objectMapper.readValue(saga.getOriginalRequest(), new TypeReference<GenericRequest<DefaultRequestHeader, LoanApplicationRequest>>() {});
+                                System.out.println("Original request: " + originalRequest);
+                                DisbursementCommand command = DisbursementCommand.builder()
+                                        .destinationWallet(originalRequest.getBody().getWalletType())
+                                        .customerId(originalRequest.getBody().getCustomerId())
+                                        .productId(originalRequest.getBody().getProductId())
+                                        .loanAmount(originalRequest.getBody().getLoanAmount())
+                                        .loanPurpose(originalRequest.getBody().getLoanPurpose())
+                                        .commandId(loanId)
+                                        .walletId(originalRequest.getBody().getWalletId())
+                                        .destinationWallet(originalRequest.getBody().getWalletType())
+                                        .build();
                                 payloadString = objectMapper.writeValueAsString(command);
                                 Helpers.log("user.validation.event", LogLevelEnum.INFO, OperationNameEnum.KAFKA_CONSUMER, "Parsed user.validation.event", null);
                             } catch (Exception e) {
@@ -153,7 +164,7 @@ public class EventListeners {
                             OutBoxEvent outBoxEvent = OutBoxEvent.builder()
                                     .aggregateType(LOAN_AGGREGATE)
                                     .aggregateId(loanId.toString())
-                                    .createdAt(LocalDateTime.now())
+                                    .createdAt(now())
                                     .isPublished(false)
                                     .payload(payloadString)
                                     .eventType(CommandsEnum.DISBURSE_COMMAND.name())

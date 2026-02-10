@@ -65,11 +65,11 @@ app:
       kafka-configs:
         topics-for-command:
           DISBURSE_COMMAND: "loan.disbursement.command"
+          DISBURSE_EVENT: "loan.disbursement.event"
           REPAYMENT_COMMAND: "loan.repayment.command"
           NOTIFY_COMMAND: "notification.command"
           PRODUCT_VALIDATION_COMMAND: "product.validation.command"
           USER_VALIDATION_COMMAND: "user.validation.command"
-          DISBURSE_EVENT: "loan.disbursement.event"
           REPAYMENT_EVENT: "loan.repayment.event"
           NOTIFY_EVENT: "notification.event"
           PRODUCT_VALIDATION_EVENT: "product.validation.event"

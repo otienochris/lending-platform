@@ -1,12 +1,24 @@
+server:
+  port: 8085
 spring:
   application:
     name: ms-loan-disbursement
   cloud:
     config:
       enabled: false
+  kafka:
+    bootstrap-servers: localhost:9092
+    consumer:
+      group-id: loan-disbursement
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
   r2dbc:
     url: r2dbc:postgresql://localhost:5432
-    name: ecommerce
+    name: lending_platform
     username: apis
     password: apis
     pool:
@@ -17,3 +29,52 @@ eureka:
       defaultZone: http://localhost:8761/eureka
     register-with-eureka: false
     fetch-registry: false
+logging:
+  level:
+    web: debug
+  file: logs/${spring.application.name}.logs
+  max-size: 10MB
+  max-history: 30
+  pattern:
+    file: "%d{yyyy-MM-dd HH:mm:ss.SSS} | severity=%5p | application=${spring.application.name} | thread=%15.15t | %m%n"
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} | severity=%5p | application=${spring.application.name} | thread=%15.15t | %m%n"
+
+app:
+  service-properties:
+    loan-disbursement-properties:
+      kafka-configs:
+        topics-for-command:
+          DISBURSE_COMMAND: "loan.disbursement.command"
+          DISBURSE_EVENT: "loan.disbursement.event"
+      securityConfigSpec:
+        whitelistedPaths:
+
+          - "/api/v1/auth/**"
+          - "/api/v1/public/**"
+          - "/actuator/health"
+          - "/actuator/info"
+          - "/v3/api-docs/**"
+          - "/swagger-ui.html"
+          - "/swagger-ui/**"
+          - "/webjars/**"
+          - "/oauth/token"
+        corsConfigs:
+          - mapping: "/**"
+            allowed-origins:
+              - http://localhost:3000
+              - http://localhost:8080
+            allowed-methods:
+              - GET
+              - POST
+              - OPTION
+              - DELETE
+              - PUT
+            allowed-headers:
+              - "*"
+            allow-credentials: true
+        jwtSpec:
+          resourceId: product-configurations
+          principalAttribute: preferred_username
+          #          issuerUri: ${AUTH_SERVER_URL:http://localhost:4011}
+          issuerUri: http://localhost:4011
+          jwkSetUri: ${app.service-properties.product-configuration.securityConfigSpec.jwtSpec.issuerUri}/.well-known/jwks.json

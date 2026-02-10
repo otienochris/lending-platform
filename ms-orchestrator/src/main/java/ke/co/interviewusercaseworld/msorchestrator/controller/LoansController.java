@@ -7,6 +7,7 @@ import ke.co.interviewusercaseworld.commons.dto.responses.GenericResponse;
 import ke.co.interviewusercaseworld.commons.dto.responses.UserValidationResponse;
 import ke.co.interviewusercaseworld.commons.enums.LogLevelEnum;
 import ke.co.interviewusercaseworld.commons.enums.OperationNameEnum;
+import ke.co.interviewusercaseworld.commons.enums.ResponseCodes;
 import ke.co.interviewusercaseworld.commons.utils.Helpers;
 import ke.co.interviewusercaseworld.msorchestrator.model.dto.request.LoanApplicationRequest;
 import ke.co.interviewusercaseworld.msorchestrator.model.dto.response.LoanApplicationAcknowledgement;
@@ -46,6 +47,17 @@ public class LoansController {
                     } else {
                         return Mono.just(ResponseEntity.badRequest().body(res));
                     }
+                }).onErrorResume(throwable -> {
+                    return Mono.just(ResponseEntity.badRequest().body(GenericResponse.<DefaultResponseHeader, LoanApplicationAcknowledgement>builder()
+                                    .header(DefaultResponseHeader.builder()
+                                            .operation(OperationNameEnum.LOAN_APPLICATION)
+                                            .responseRefId("")
+                                            .responseCode(ResponseCodes.RC_400)
+                                            .customerMessage("Error occurred while applying for loan")
+                                            .debugMessage(throwable.getMessage())
+                                            .sourceSystem("MS-LOAN-DISBURSEMENT")
+                                            .build())
+                            .build()));
                 });
 
     }
