@@ -6,15 +6,19 @@ import ke.co.expd.authserver.repoisitory.OutBoxEventRepository;
 import ke.co.expd.authserver.service.AuthService;
 import ke.co.interviewusercaseworld.commons.dto.commands.UserValidationCommand;
 import ke.co.interviewusercaseworld.commons.dto.events.ProductValidationEvent;
+import ke.co.interviewusercaseworld.commons.dto.events.UserValidationEvent;
+import ke.co.interviewusercaseworld.commons.dto.responses.UserValidationResponse;
 import ke.co.interviewusercaseworld.commons.enums.CommandsEnum;
 import ke.co.interviewusercaseworld.commons.enums.LogLevelEnum;
 import ke.co.interviewusercaseworld.commons.enums.OperationNameEnum;
+import ke.co.interviewusercaseworld.commons.enums.ResponseCodes;
 import ke.co.interviewusercaseworld.commons.utils.Helpers;
 import lombok.RequiredArgsConstructor;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.UUID;
@@ -46,12 +50,23 @@ public class EventListeners {
                 .flatMap(res -> {
                     Helpers.log("user.validation.command", LogLevelEnum.INFO, OperationNameEnum.KAFKA_CONSUMER, "Validated user: " + userId, null);
 
-                    UserValidationCommand command = UserValidationCommand.builder()
+                    UserValidationEvent command = UserValidationEvent.builder()
                             .userId(finalUserValidationCommand.getUserId())
                             .commandId(finalUserValidationCommand.getCommandId())
                             .message(res.getHeader().getCustomerMessage())
                             .status(res.getHeader().getResponseCode().name())
                             .build();
+
+                    if (ResponseCodes.RC_200.name().equalsIgnoreCase(res.getHeader().getResponseCode().name())) {
+                        UserValidationResponse body = res.getBody();
+                        BigDecimal loanLimit = body.getLoanLimit();
+
+                        if (loanLimit == null || finalUserValidationCommand.getLoanAmount().compareTo(loanLimit) > 0) {
+                            command.setStatus(ResponseCodes.RC_400.name());
+                            command.setMessage("Loan amount exceeds loan limit");
+                        }
+                    }
+
                     try {
                         String payloadString = objectMapper.writeValueAsString(command);
                         OutboxEvent outboxEvent = OutboxEvent.builder()

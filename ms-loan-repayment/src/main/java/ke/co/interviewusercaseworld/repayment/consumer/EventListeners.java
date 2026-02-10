@@ -37,40 +37,40 @@ public class EventListeners {
     public Mono<Void> onProductValidationCommand(String payload) {
         Helpers.log("", LogLevelEnum.INFO, OperationNameEnum.KAFKA_CONSUMER, "Received message from loan.repayment.command: " + payload, null);
 
-        RepaymentCommand productValidationCommand = null;
+        RepaymentCommand repaymentCommand = null;
         try{
-            productValidationCommand = objectMapper.readValue(payload, RepaymentCommand.class);
+            repaymentCommand = objectMapper.readValue(payload, RepaymentCommand.class);
             Helpers.log("loan.repayment.command", LogLevelEnum.INFO, OperationNameEnum.KAFKA_CONSUMER, "Parsed loan.repayment.command", null);
         } catch (Exception e){
             Helpers.log("loan.repayment.command", LogLevelEnum.ERROR, OperationNameEnum.KAFKA_CONSUMER, "Error parsing loan.repayment.command", e);
             return Mono.empty();
         }
 
-        if (productValidationCommand.getPrincipal() == null) {
+        if (repaymentCommand.getPrincipal() == null) {
             Helpers.log("loan.repayment.command", LogLevelEnum.ERROR, OperationNameEnum.KAFKA_CONSUMER, "Principal amount is null", null);
             return Mono.empty();
         }
 
-        RepaymentCommand finalProductValidationCommand = productValidationCommand;
-        UUID productId = productValidationCommand.getProductId();
+        RepaymentCommand finalProductValidationCommand = repaymentCommand;
+        UUID productId = repaymentCommand.getProductId();
 
         if (productId == null ) {
             Helpers.log("loan.repayment.command", LogLevelEnum.ERROR, OperationNameEnum.KAFKA_CONSUMER, "Product id is null", null);
             return Mono.empty();
         }
-        BigDecimal amount = productValidationCommand.getPrincipal();
+        BigDecimal amount = repaymentCommand.getPrincipal();
         GenericRequest<DefaultResponseHeader, LoanRepaymentSchedulingDto> disbursementRequest = GenericRequest.<DefaultResponseHeader, LoanRepaymentSchedulingDto>builder()
                 .header(DefaultResponseHeader.builder().build())
                 .body(LoanRepaymentSchedulingDto.builder()
-                        .loanId(productValidationCommand.getCommandId())
+                        .loanId(repaymentCommand.getCommandId())
                         .productId(productId)
                         .principal(amount)
-                        .customerId(productValidationCommand.getCustomerId())
-                        .interestRate(productValidationCommand.getInterestRate())
-                        .tenure(productValidationCommand.getTenure())
-                        .interestRateType(productValidationCommand.getInterestRateType())
-                        .tenureType(productValidationCommand.getTenureType())
-                        .isInstallment(productValidationCommand.getIsInstallment())
+                        .customerId(repaymentCommand.getCustomerId())
+                        .interestRate(repaymentCommand.getInterestRate())
+                        .tenure(repaymentCommand.getTenure())
+                        .interestRateType(repaymentCommand.getInterestRateType())
+                        .tenureType(repaymentCommand.getTenureType())
+                        .isInstallment(repaymentCommand.getIsInstallment())
                         .build())
                 .build();
         return loanRepaymentService.schedule(disbursementRequest)
@@ -82,6 +82,7 @@ public class EventListeners {
                             .status(res.getHeader().getResponseCode().name())
                             .dueDate(now().plusMonths(1))
                             .totalLoanAmount(res.getBody() == null? BigDecimal.ZERO: res.getBody().getTotalOutstandingAmount())// todo
+                            .totalInterest(res.getBody() == null? BigDecimal.ZERO: res.getBody().getTotalInterest())
                             .build();
 
                     try {

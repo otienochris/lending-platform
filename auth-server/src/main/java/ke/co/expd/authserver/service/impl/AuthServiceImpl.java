@@ -287,7 +287,6 @@ public class AuthServiceImpl implements AuthService {
                                 .build());
                     }
 
-
                     UserValidationResponse response = UserValidationResponse.builder()
                             .isValid(true)
                             .isBlacklisted(false) //todo
@@ -295,6 +294,7 @@ public class AuthServiceImpl implements AuthService {
                             .lastName(user.getLastName())
                             .msisdn(user.getMsisdn())
                             .email(user.getEmail())
+                            .loanLimit(user.getLoanLimit())
                             .build();
                     Helpers.log(defaultRequestHeaderObject.getRequestRefId(), LogLevelEnum.info, defaultRequestHeaderObject.getOperation(), "User validated successfuly", null);
                     return Mono.just(GenericResponse.<DefaultResponseHeader, UserValidationResponse>builder()

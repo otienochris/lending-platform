@@ -5,6 +5,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.math.BigDecimal;
 import java.util.UUID;
 
 @Data
@@ -14,6 +15,5 @@ import java.util.UUID;
 public class UserValidationCommand {
     private UUID commandId;
     private UUID userId;
-    private String status;
-    private String message;
+    private BigDecimal loanAmount;
 }

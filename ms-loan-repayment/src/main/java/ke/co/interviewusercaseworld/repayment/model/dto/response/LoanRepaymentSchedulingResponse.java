@@ -13,4 +13,5 @@ import java.math.BigDecimal;
 @NoArgsConstructor
 public class LoanRepaymentSchedulingResponse {
     private BigDecimal totalOutstandingAmount;
+    private BigDecimal totalInterest;
 }

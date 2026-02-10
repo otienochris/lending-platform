@@ -5,6 +5,8 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.math.BigDecimal;
+
 @Data
 @Builder
 @AllArgsConstructor
@@ -17,4 +19,5 @@ public class UserValidationResponse {
     private String lastName;
     private boolean isFraudulent;
     private boolean isBlacklisted;
+    private BigDecimal loanLimit;
 }

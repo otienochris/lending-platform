@@ -41,6 +41,34 @@ public class LoanRepaymentServiceImpl implements LoanRepaymentService {
             LoanRepaymentSchedulingDto dto,
             LocalDate firstDueDate
     ) {
+
+        if (!dto.getIsInstallment()) {
+            BigDecimal interest = switch (dto.getTenureType()) {
+                case DAYS -> dto.getPrincipal().multiply(dto.getInterestRate()).divide(BigDecimal.valueOf(365), 2, RoundingMode.HALF_UP);
+                case MONTHS -> dto.getPrincipal().multiply(dto.getInterestRate()).divide(BigDecimal.valueOf(12), 2, RoundingMode.HALF_UP);
+                case YEARS -> dto.getPrincipal().multiply(dto.getInterestRate()).divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
+                default -> BigDecimal.ONE;
+            };
+
+            LocalDateTime now = LocalDateTime.now();
+            LocalDateTime dueDate = switch (dto.getTenureType()) {
+                case DAYS -> now.plusDays(dto.getTenure());
+                case MONTHS -> now.plusMonths(dto.getTenure());
+                case YEARS -> now.plusYears(dto.getTenure());
+                default -> now;
+            };
+
+            BigDecimal total = dto.getPrincipal().add(interest);
+            return Flux.just(RepaymentSchedule.builder()
+                    .loanId(dto.getLoanId())
+                    .dueDate(dueDate.toLocalDate())
+                    .emiAmount(total)
+                    .principalComponent(dto.getPrincipal())
+                    .interestComponent(interest)
+                    .status("PENDING")
+                    .build());
+        }
+
         int months = resolveTenureInMonths(dto);
         final BigDecimal[] emi = {Helpers.calculateEmi(
                 dto.getPrincipal(),
@@ -122,6 +150,7 @@ public class LoanRepaymentServiceImpl implements LoanRepaymentService {
                 ).collectList()
                 .flatMap(repaymentSchedule -> {
                     BigDecimal totalOutstanding = repaymentSchedule.stream().map(RepaymentSchedule::getEmiAmount).reduce(BigDecimal.ZERO, BigDecimal::add);
+                    BigDecimal totalInterest = repaymentSchedule.stream().map(RepaymentSchedule::getInterestComponent).reduce(BigDecimal.ZERO, BigDecimal::add);
                     return Mono.just(GenericResponse.<DefaultResponseHeader, LoanRepaymentSchedulingResponse>builder()
                             .header(DefaultResponseHeader.builder()
                                     .customerMessage("Loan repayment schedule created successfully")
@@ -131,6 +160,7 @@ public class LoanRepaymentServiceImpl implements LoanRepaymentService {
                                     .build())
                                     .body(LoanRepaymentSchedulingResponse.builder()
                                             .totalOutstandingAmount(totalOutstanding)
+                                            .totalInterest(totalInterest)
                                             .build())
                             .build());
                 });

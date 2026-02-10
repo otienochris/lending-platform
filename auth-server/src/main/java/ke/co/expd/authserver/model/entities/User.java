@@ -9,6 +9,7 @@ import org.springframework.data.annotation.Transient;
 import org.springframework.data.relational.core.mapping.Column;
 import org.springframework.data.relational.core.mapping.Table;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.Set;
@@ -69,6 +70,8 @@ public class User {
 
     @Column("is_account_non_locked")
     private boolean isAccountNonLocked = true;
+
+    private BigDecimal loanLimit;
 
     @Transient
     private Set<Role> roles = new HashSet<>();

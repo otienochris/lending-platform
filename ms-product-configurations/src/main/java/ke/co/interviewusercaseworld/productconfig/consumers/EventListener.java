@@ -6,7 +6,9 @@ import ke.co.interviewusercaseworld.commons.dto.events.ProductValidationEvent;
 import ke.co.interviewusercaseworld.commons.enums.CommandsEnum;
 import ke.co.interviewusercaseworld.commons.enums.LogLevelEnum;
 import ke.co.interviewusercaseworld.commons.enums.OperationNameEnum;
+import ke.co.interviewusercaseworld.commons.enums.ResponseCodes;
 import ke.co.interviewusercaseworld.commons.utils.Helpers;
+import ke.co.interviewusercaseworld.productconfig.model.dto.response.LoanProductCreationResponseDto;
 import ke.co.interviewusercaseworld.productconfig.model.entity.OutboxEvent;
 import ke.co.interviewusercaseworld.productconfig.repository.OutBoxEventRepository;
 import ke.co.interviewusercaseworld.productconfig.service.LoanProductService;
@@ -15,6 +17,7 @@ import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.UUID;
@@ -48,12 +51,33 @@ public class EventListener {
         }
         return loanProductService.getLoanProduct(productId, Map.of())
                 .flatMap(res -> {
+
                     ProductValidationEvent command = ProductValidationEvent.builder()
                             .productId(finalProductValidationCommand.getProductId())
                             .commandId(finalProductValidationCommand.getCommandId())
                             .message(res.getHeader().getCustomerMessage())
                             .status(res.getHeader().getResponseCode().name())
                             .build();
+
+                    if (res.getHeader().getResponseCode().name().startsWith("RC_2")) {
+                        LoanProductCreationResponseDto body = res.getBody();
+                        Boolean supportInstallments = body.getSupportInstallments();
+                        BigDecimal minAmount = body.getMinAmount();
+                        BigDecimal maxAmount = body.getMaxAmount();
+
+                        Boolean installment = finalProductValidationCommand.getInstallment();
+                        BigDecimal loanAmount = finalProductValidationCommand.getLoanAmount();
+
+                        if (installment && !supportInstallments) {
+                            command.setStatus(ResponseCodes.RC_400.name());
+                            command.setMessage("Installment is not supported for this loan amount");
+                        } else if (loanAmount.compareTo(minAmount) < 0 || loanAmount.compareTo(maxAmount) > 0) {
+                            command.setStatus(ResponseCodes.RC_400.name());
+                            command.setMessage("Loan amount must be between " + minAmount + " and " + maxAmount);
+                        }
+
+                    }
+
                     try {
                         String payloadString = objectMapper.writeValueAsString(command);
                         OutboxEvent outboxEvent = OutboxEvent.builder()

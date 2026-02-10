@@ -18,7 +18,7 @@ spring:
       enabled: false
   r2dbc:
     url: r2dbc:postgresql://localhost:5432
-    name: lending_platform
+    name: crm
     username: apis
     password: apis
     pool:

@@ -22,4 +22,6 @@ public class LoanApplicationRequest {
     @Builder.Default
     private WalletTypeEnum walletType = WalletTypeEnum.MobileMoney;
     private String walletId;
+    @Builder.Default
+    private Boolean installment = false;
 }

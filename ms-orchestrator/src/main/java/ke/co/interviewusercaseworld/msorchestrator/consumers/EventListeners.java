@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import ke.co.interviewusercaseworld.commons.dto.commands.DisbursementCommand;
 import ke.co.interviewusercaseworld.commons.dto.commands.RepaymentCommand;
+import ke.co.interviewusercaseworld.commons.dto.events.*;
 import ke.co.interviewusercaseworld.commons.dto.requests.DefaultRequestHeader;
 import ke.co.interviewusercaseworld.commons.dto.requests.GenericRequest;
 import ke.co.interviewusercaseworld.commons.enums.*;
@@ -11,7 +12,6 @@ import ke.co.interviewusercaseworld.commons.utils.Helpers;
 import ke.co.interviewusercaseworld.msorchestrator.model.dto.request.LoanApplicationRequest;
 import ke.co.interviewusercaseworld.msorchestrator.model.dto.request.commands.NotificationCommand;
 import ke.co.interviewusercaseworld.msorchestrator.model.dto.request.commands.UserValidationCommand;
-import ke.co.interviewusercaseworld.msorchestrator.model.dto.request.events.*;
 import ke.co.interviewusercaseworld.msorchestrator.model.entities.OutBoxEvent;
 import ke.co.interviewusercaseworld.msorchestrator.model.entities.Saga;
 import ke.co.interviewusercaseworld.msorchestrator.model.entities.SagaStep;
@@ -61,6 +61,7 @@ public class EventListeners {
             return Mono.empty();
         }
 
+
         UUID loanId = productValidationEvent.getCommandId();
         return sagaRepo.findByBusinessKey(loanId)
                 .flatMap(saga -> stepRepo.findBySagaIdAndStepName(saga.getId(), PRODUCT_VALIDATION_STEP)
@@ -68,20 +69,32 @@ public class EventListeners {
 
                             GenericRequest<DefaultRequestHeader, LoanApplicationRequest> originalRequest;
                             String payloadString;
+                            String notificationCommandString;
                             try {
 
                                 String sagaOriginalRequest = saga.getOriginalRequest();
 
-                                originalRequest = objectMapper.readValue(sagaOriginalRequest, new com.fasterxml.jackson.core.type.TypeReference<GenericRequest<DefaultRequestHeader, LoanApplicationRequest>>() {
+                                originalRequest = objectMapper.readValue(sagaOriginalRequest, new TypeReference<GenericRequest<DefaultRequestHeader, LoanApplicationRequest>>() {
                                 });
 
                                 UserValidationCommand command = UserValidationCommand.builder()
                                         .userId(originalRequest.getBody().getCustomerId())
                                         .commandId(loanId)
+                                        .loanAmount(originalRequest.getBody().getLoanAmount())
+                                        .build();
+                                String message = productValidationEvent.getMessage();
+                                NotificationCommand notificationCommand = NotificationCommand.builder()
+                                        .commandId(loanId)
+                                        .types(List.of(NotificationTypeEnum.SMS, NotificationTypeEnum.EMAIL))
+                                        .template("PRODUCT_VALIDATION_FAILED_TEMPLATE")
+                                        .principal(NotificationCommand.Recipient.builder().build())
+                                        .templateParamValues(Map.of("CUSTOMER_MESSAGE", message == null ? "Product validation failed" : message))
                                         .build();
 
                                 payloadString = objectMapper.writeValueAsString(command);
+                                notificationCommandString = objectMapper.writeValueAsString(notificationCommand);
                             } catch (Exception e) {
+                                e.printStackTrace();
                                 Helpers.log("", LogLevelEnum.ERROR, OperationNameEnum.KAFKA_CONSUMER, "Error creating user validation command", e);
                                 throw new RuntimeException(e);
                             }
@@ -91,14 +104,28 @@ public class EventListeners {
                             sagaStep.setStatus(COMPLETED_STATUS);
 
 
-                            OutBoxEvent outBoxEvent = OutBoxEvent.builder()
-                                    .aggregateType(LOAN_AGGREGATE)
-                                    .aggregateId(loanId.toString())
-                                    .createdAt(now())
-                                    .isPublished(false)
-                                    .payload(payloadString)
-                                    .eventType(CommandsEnum.USER_VALIDATION_COMMAND.name())
-                                    .build();
+                            OutBoxEvent outBoxEvent;
+                            if (!ResponseCodes.RC_200.name().equalsIgnoreCase(productValidationEvent.getStatus())) {
+                                Helpers.log("product.validation.event", LogLevelEnum.INFO, OperationNameEnum.KAFKA_CONSUMER, "Sending notification event", null);
+                                outBoxEvent = OutBoxEvent.builder()
+                                        .aggregateType(LOAN_AGGREGATE)
+                                        .aggregateId(loanId.toString())
+                                        .createdAt(now())
+                                        .isPublished(false)
+                                        .payload(notificationCommandString)
+                                        .eventType(CommandsEnum.NOTIFY_COMMAND.name())
+                                        .build();
+                            } else {
+                                Helpers.log("product.validation.event", LogLevelEnum.INFO, OperationNameEnum.KAFKA_CONSUMER, "Sending user validation event", null);
+                                outBoxEvent = OutBoxEvent.builder()
+                                        .aggregateType(LOAN_AGGREGATE)
+                                        .aggregateId(loanId.toString())
+                                        .createdAt(now())
+                                        .isPublished(false)
+                                        .payload(payloadString)
+                                        .eventType(CommandsEnum.USER_VALIDATION_COMMAND.name())
+                                        .build();
+                            }
 
                             return stepRepo.save(sagaStep)
                                     .then(stepRepo.save(nextStep(saga, USER_VALIDATION_STEP)))
@@ -132,21 +159,36 @@ public class EventListeners {
                             GenericRequest<DefaultRequestHeader, LoanApplicationRequest> originalRequest;
                             String payloadString;
 
+                            boolean notSuccessful = !ResponseCodes.RC_200.name().equalsIgnoreCase(userValidationEvent.getStatus());
                             try {
                                 originalRequest = objectMapper.readValue(saga.getOriginalRequest(), new TypeReference<GenericRequest<DefaultRequestHeader, LoanApplicationRequest>>() {
                                 });
-                                System.out.println("Original request: " + originalRequest);
-                                DisbursementCommand command = DisbursementCommand.builder()
-                                        .destinationWallet(originalRequest.getBody().getWalletType())
-                                        .customerId(originalRequest.getBody().getCustomerId())
-                                        .productId(originalRequest.getBody().getProductId())
-                                        .loanAmount(originalRequest.getBody().getLoanAmount())
-                                        .loanPurpose(originalRequest.getBody().getLoanPurpose())
-                                        .commandId(loanId)
-                                        .walletId(originalRequest.getBody().getWalletId())
-                                        .destinationWallet(originalRequest.getBody().getWalletType())
-                                        .build();
-                                payloadString = objectMapper.writeValueAsString(command);
+
+
+                                if (notSuccessful) {
+                                    NotificationCommand notificationCommand = NotificationCommand.builder()
+                                            .commandId(loanId)
+                                            .types(List.of(NotificationTypeEnum.SMS, NotificationTypeEnum.EMAIL))
+                                            .template("USER_VALIDATION_FAILED_TEMPLATE")
+                                            .principal(NotificationCommand.Recipient.builder().build())
+                                            .templateParamValues(Map.of("CUSTOMER_MESSAGE", userValidationEvent.getMessage()))
+                                            .build();
+                                    payloadString = objectMapper.writeValueAsString(notificationCommand);
+                                } else {
+                                    DisbursementCommand command = DisbursementCommand.builder()
+                                            .destinationWallet(originalRequest.getBody().getWalletType())
+                                            .customerId(originalRequest.getBody().getCustomerId())
+                                            .productId(originalRequest.getBody().getProductId())
+                                            .loanAmount(originalRequest.getBody().getLoanAmount())
+                                            .loanPurpose(originalRequest.getBody().getLoanPurpose())
+                                            .commandId(loanId)
+                                            .walletId(originalRequest.getBody().getWalletId())
+                                            .destinationWallet(originalRequest.getBody().getWalletType())
+                                            .build();
+                                    payloadString = objectMapper.writeValueAsString(command);
+                                }
+
+
                                 Helpers.log("user.validation.event", LogLevelEnum.INFO, OperationNameEnum.KAFKA_CONSUMER, "Parsed user.validation.event", null);
                             } catch (Exception e) {
                                 Helpers.log("", LogLevelEnum.ERROR, OperationNameEnum.KAFKA_CONSUMER, "Error creating loan application command", e);
@@ -158,15 +200,27 @@ public class EventListeners {
 
                             sagaStep.setStatus(COMPLETED_STATUS);
 
+                            OutBoxEvent outBoxEvent;
+                            if (notSuccessful) {
+                                outBoxEvent = OutBoxEvent.builder()
+                                        .aggregateType(LOAN_AGGREGATE)
+                                        .aggregateId(loanId.toString())
+                                        .createdAt(now())
+                                        .isPublished(false)
+                                        .payload(payloadString)
+                                        .eventType(CommandsEnum.NOTIFY_COMMAND.name())
+                                        .build();
+                            } else {
+                                outBoxEvent = OutBoxEvent.builder()
+                                        .aggregateType(LOAN_AGGREGATE)
+                                        .aggregateId(loanId.toString())
+                                        .createdAt(now())
+                                        .isPublished(false)
+                                        .payload(payloadString)
+                                        .eventType(CommandsEnum.DISBURSE_COMMAND.name())
+                                        .build();
+                            }
 
-                            OutBoxEvent outBoxEvent = OutBoxEvent.builder()
-                                    .aggregateType(LOAN_AGGREGATE)
-                                    .aggregateId(loanId.toString())
-                                    .createdAt(now())
-                                    .isPublished(false)
-                                    .payload(payloadString)
-                                    .eventType(CommandsEnum.DISBURSE_COMMAND.name())
-                                    .build();
 
                             return stepRepo.save(sagaStep)
                                     .then(stepRepo.save(nextStep(saga, LOAN_DISBURSEMENT_STEP)))
@@ -190,6 +244,7 @@ public class EventListeners {
 
         UUID loanId = disbursementEvent.getCommandId();
 
+        boolean notSuccessful = !ResponseCodes.RC_200.name().equalsIgnoreCase(disbursementEvent.getStatus());
         return sagaRepo.findByBusinessKey(loanId)
                 .flatMap(saga -> stepRepo.findBySagaIdAndStepName(saga.getId(), LOAN_DISBURSEMENT_STEP)
                         .flatMap(sagaStep -> tx.execute(status -> {
@@ -199,18 +254,34 @@ public class EventListeners {
                             try {
                                 originalRequest = objectMapper.readValue(saga.getOriginalRequest(), new com.fasterxml.jackson.core.type.TypeReference<GenericRequest<DefaultRequestHeader, LoanApplicationRequest>>() {
                                 });
-                                RepaymentCommand command = RepaymentCommand.builder()
-                                        .principal(originalRequest.getBody().getLoanAmount())
-                                        .loanId(loanId)
-                                        .productId(originalRequest.getBody().getProductId())
-                                        .tenure(originalRequest.getBody().getTenure())
-                                        .interestRate(BigDecimal.TEN)// todo
-                                        .commandId(loanId)
-                                        .tenureType(TenureOptionsTypeEnum.MONTHS)
-                                        .customerId(originalRequest.getBody().getCustomerId())
-                                        .build();
 
-                                payloadString = objectMapper.writeValueAsString(command);
+
+                                if (notSuccessful) {
+                                    String message = disbursementEvent.getMessage();
+                                    NotificationCommand notificationCommand = NotificationCommand.builder()
+                                            .commandId(loanId)
+                                            .types(List.of(NotificationTypeEnum.SMS, NotificationTypeEnum.EMAIL))
+                                            .template("DISBURSAL_FAILED_TEMPLATE")
+                                            .principal(NotificationCommand.Recipient.builder().build())
+                                            .templateParamValues(Map.of("CUSTOMER_MESSAGE", message == null ? "Disbursement failed" : message))
+                                            .build();
+                                    payloadString = objectMapper.writeValueAsString(notificationCommand);
+                                } else {
+                                    RepaymentCommand command = RepaymentCommand.builder()
+                                            .principal(originalRequest.getBody().getLoanAmount())
+                                            .loanId(loanId)
+                                            .productId(originalRequest.getBody().getProductId())
+                                            .tenure(originalRequest.getBody().getTenure())
+                                            .interestRate(BigDecimal.TEN)// todo
+                                            .commandId(loanId)
+                                            .tenureType(TenureOptionsTypeEnum.MONTHS)
+                                            .customerId(originalRequest.getBody().getCustomerId())
+                                            .isInstallment(originalRequest.getBody().getInstallment())
+                                            .build();
+
+                                    payloadString = objectMapper.writeValueAsString(command);
+                                }
+
                             } catch (Exception e) {
                                 Helpers.log("", LogLevelEnum.ERROR, OperationNameEnum.KAFKA_CONSUMER, "Error creating loan repayment command", e);
                                 throw new RuntimeException(e);
@@ -221,15 +292,28 @@ public class EventListeners {
 
                             sagaStep.setStatus(COMPLETED_STATUS);
 
+                            OutBoxEvent outBoxEvent;
+                            if (notSuccessful) {
+                                outBoxEvent = OutBoxEvent.builder()
+                                        .aggregateType(LOAN_AGGREGATE)
+                                        .aggregateId(loanId.toString())
+                                        .createdAt(now())
+                                        .isPublished(false)
+                                        .payload(payloadString)
+                                        .eventType(CommandsEnum.NOTIFY_COMMAND.name())
+                                        .build();
+                            } else {
 
-                            OutBoxEvent outBoxEvent = OutBoxEvent.builder()
-                                    .aggregateType(LOAN_AGGREGATE)
-                                    .aggregateId(loanId.toString())
-                                    .createdAt(now())
-                                    .isPublished(false)
-                                    .payload(payloadString)
-                                    .eventType(CommandsEnum.REPAYMENT_COMMAND.name())
-                                    .build();
+                                outBoxEvent = OutBoxEvent.builder()
+                                        .aggregateType(LOAN_AGGREGATE)
+                                        .aggregateId(loanId.toString())
+                                        .createdAt(now())
+                                        .isPublished(false)
+                                        .payload(payloadString)
+                                        .eventType(CommandsEnum.REPAYMENT_COMMAND.name())
+                                        .build();
+                            }
+
 
                             return stepRepo.save(sagaStep)
                                     .then(stepRepo.save(nextStep(saga, LOAN_REPAYMENT_STEP)))
@@ -254,6 +338,7 @@ public class EventListeners {
         UUID loanId = repaymentEvent.getCommandId();
 
         RepaymentEvent finalRepaymentEvent = repaymentEvent;
+        boolean notSuccessful = !ResponseCodes.RC_200.name().equalsIgnoreCase(finalRepaymentEvent.getStatus());
         return sagaRepo.findByBusinessKey(loanId)
                 .flatMap(saga -> stepRepo.findBySagaIdAndStepName(saga.getId(), LOAN_REPAYMENT_STEP)
                         .flatMap(sagaStep -> tx.execute(status -> {
@@ -263,23 +348,34 @@ public class EventListeners {
 
                             sagaStep.setStatus(COMPLETED_STATUS);
 
-                            NotificationCommand command = NotificationCommand.builder()
-                                    .commandId(loanId)
-                                    .template("SUCCESSFUL_LOAN_DISBURSEMENT")
-                                    .types(List.of(NotificationTypeEnum.SMS, NotificationTypeEnum.EMAIL))
-                                    .templateParamValues(Map.of(
-                                            "AMOUNT", finalRepaymentEvent.getTotalLoanAmount(),
-                                            "DUE_DATE", finalRepaymentEvent.getDueDate(),
-                                            "TOTAL_INTEREST", finalRepaymentEvent.getTotalInterest()))
-                                    .principal(NotificationCommand.Recipient.builder()
-                                            .msisdn("254742887480")
-                                            .to(List.of("ohtischris@gmail.com"))
-                                            .build())
-                                    .build();
-
                             String payloadString;
                             try {
-                                payloadString = objectMapper.writeValueAsString(command);
+                                if (notSuccessful) {
+                                    String message = finalRepaymentEvent.getMessage();
+                                    NotificationCommand notificationCommand = NotificationCommand.builder()
+                                            .commandId(loanId)
+                                            .types(List.of(NotificationTypeEnum.SMS, NotificationTypeEnum.EMAIL))
+                                            .template("REPAYMENT_FAILED_TEMPLATE")
+                                            .principal(NotificationCommand.Recipient.builder().build())
+                                            .templateParamValues(Map.of("CUSTOMER_MESSAGE", message == null ? "Disbursement failed" : message))
+                                            .build();
+                                    payloadString = objectMapper.writeValueAsString(notificationCommand);
+                                } else {
+                                    NotificationCommand command = NotificationCommand.builder()
+                                            .commandId(loanId)
+                                            .template("SUCCESSFUL_LOAN_DISBURSEMENT")
+                                            .types(List.of(NotificationTypeEnum.SMS, NotificationTypeEnum.EMAIL))
+                                            .templateParamValues(Map.of(
+                                                    "AMOUNT", finalRepaymentEvent.getTotalLoanAmount(),
+                                                    "DUE_DATE", finalRepaymentEvent.getDueDate(),
+                                                    "TOTAL_INTEREST", finalRepaymentEvent.getTotalInterest()))
+                                            .principal(NotificationCommand.Recipient.builder()
+                                                    .msisdn("254742887480")
+                                                    .to(List.of("ohtischris@gmail.com"))
+                                                    .build())
+                                            .build();
+                                    payloadString = objectMapper.writeValueAsString(command);
+                                }
                             } catch (Exception e) {
                                 Helpers.log("", LogLevelEnum.ERROR, OperationNameEnum.KAFKA_CONSUMER, "Error creating notification command", e);
                                 throw new RuntimeException(e);

@@ -72,7 +72,10 @@ public class LoanServiceImpl implements LoanService {
         ProductValidationCommand productValidationCommand = ProductValidationCommand.builder()
                 .productId(request.getBody().getProductId())
                 .commandId(loanId)
+                .loanAmount(request.getBody().getLoanAmount())
+                .installment(request.getBody().getInstallment())
                 .build();
+
         OutBoxEvent outBoxEvent = OutBoxEvent.builder()
                 .aggregateType("LOAN")
                 .aggregateId(loanId.toString())
