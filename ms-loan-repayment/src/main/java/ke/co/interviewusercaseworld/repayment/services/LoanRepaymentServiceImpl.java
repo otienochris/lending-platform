@@ -3,12 +3,12 @@ package ke.co.interviewusercaseworld.repayment.services;
 import ke.co.interviewusercaseworld.commons.dto.requests.GenericRequest;
 import ke.co.interviewusercaseworld.commons.dto.responses.DefaultResponseHeader;
 import ke.co.interviewusercaseworld.commons.dto.responses.GenericResponse;
-import ke.co.interviewusercaseworld.commons.enums.LogLevelEnum;
-import ke.co.interviewusercaseworld.commons.enums.OperationNameEnum;
-import ke.co.interviewusercaseworld.commons.enums.ResponseCodes;
-import ke.co.interviewusercaseworld.commons.enums.TenureOptionsTypeEnum;
+import ke.co.interviewusercaseworld.commons.enums.*;
 import ke.co.interviewusercaseworld.commons.utils.Helpers;
+import ke.co.interviewusercaseworld.repayment.mappers.LoanMapper;
+import ke.co.interviewusercaseworld.repayment.mappers.RepaymentScheduleMapper;
 import ke.co.interviewusercaseworld.repayment.model.dto.requests.LoanRepaymentSchedulingDto;
+import ke.co.interviewusercaseworld.repayment.model.dto.response.LoanQueryResponseDto;
 import ke.co.interviewusercaseworld.repayment.model.dto.response.LoanRepaymentSchedulingResponse;
 import ke.co.interviewusercaseworld.repayment.model.entities.Loan;
 import ke.co.interviewusercaseworld.repayment.model.entities.LoanRepository;
@@ -24,18 +24,21 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.stream.Stream;
 
 @Service
 @RequiredArgsConstructor
 public class LoanRepaymentServiceImpl implements LoanRepaymentService {
 
 
-    private final RepaymentScheduleRepository repository;
+    private final RepaymentScheduleRepository repaymentScheduleRepository;
     private final LoanRepository loanRepository;
     private final TransactionalOperator operator;
+    private final RepaymentScheduleMapper repaymentScheduleMapper;
+    private final LoanMapper loanMapper;
 
     public Flux<RepaymentSchedule> createSchedule(
             LoanRepaymentSchedulingDto dto,
@@ -65,7 +68,7 @@ public class LoanRepaymentServiceImpl implements LoanRepaymentService {
                     .emiAmount(total)
                     .principalComponent(dto.getPrincipal())
                     .interestComponent(interest)
-                    .status("PENDING")
+                    .status(LoanStatusEnum.OPEN.name())
                     .build());
         }
 
@@ -110,7 +113,7 @@ public class LoanRepaymentServiceImpl implements LoanRepaymentService {
                             .status("PENDING")
                             .build();
                 })
-                .flatMap(repository::save);
+                .flatMap(repaymentScheduleRepository::save);
     }
 
     private int resolveTenureInMonths(LoanRepaymentSchedulingDto dto) {
@@ -135,7 +138,7 @@ public class LoanRepaymentServiceImpl implements LoanRepaymentService {
                 .customerId(request.getBody().getCustomerId())
                 .principalAmount(request.getBody().getPrincipal())
                 .tenureMonths(resolveTenureInMonths(request.getBody()))
-                .status("PENDING")
+                .status(LoanStatusEnum.OPEN.name())
                 .createdAt(LocalDateTime.now())
                 .outstandingAmount(request.getBody().getPrincipal()) // todo
                 .build();
@@ -144,7 +147,7 @@ public class LoanRepaymentServiceImpl implements LoanRepaymentService {
                         .flatMapMany(savedLoan -> createSchedule(request.getBody(), firstDueDate)
                         .flatMap(repaymentSchedule -> {
                             repaymentSchedule.setLoanId(savedLoan.getId());
-                            return repository.save(repaymentSchedule);
+                            return repaymentScheduleRepository.save(repaymentSchedule);
                         })
                         .doOnError(throwable -> Helpers.log("", LogLevelEnum.error, OperationNameEnum.REPAYMENT_SCHEDULING, "", new RuntimeException(throwable))))
                 ).collectList()
@@ -165,5 +168,50 @@ public class LoanRepaymentServiceImpl implements LoanRepaymentService {
                             .build());
                 });
 
+    }
+
+    @Override
+    public Mono<GenericResponse<DefaultResponseHeader, List<LoanQueryResponseDto>>> queryLoans(UUID userId, LoanStatusEnum loanStatus) {
+        return getAllByCustomerIdAndStatus(userId, loanStatus)
+                .flatMap(loan -> {
+                    LoanQueryResponseDto loanQueryResponseDto = loanMapper.toDto(loan);
+                    return repaymentScheduleRepository.findAllByLoanId(loan.getId())
+                            .map(repaymentScheduleMapper::toDto)
+                            .collectList()
+                            .flatMap(repaymentSchedules -> {
+                                loanQueryResponseDto.setLoanRepaymentSchedule(repaymentSchedules);
+                                return Mono.just(loanQueryResponseDto);
+                            });
+                })
+                .collectList()
+                .map(loanQueryResponseDtos -> {
+                    if (loanQueryResponseDtos.isEmpty()) {
+                        return GenericResponse.<DefaultResponseHeader, List<LoanQueryResponseDto>>builder()
+                                .header(DefaultResponseHeader.builder()
+                                        .customerMessage("No " + loanStatus +" loans found")
+                                        .responseCode(ResponseCodes.RC_404)
+                                        .responseRefId("")
+                                        .operation(OperationNameEnum.LOAN_QUERY)
+                                        .build())
+                                .body(new ArrayList<>())
+                                .build();
+                    }
+                    return GenericResponse.<DefaultResponseHeader, List<LoanQueryResponseDto>>builder()
+                                    .header(DefaultResponseHeader.builder()
+                                            .customerMessage("Loan query successful")
+                                            .responseCode(ResponseCodes.RC_200)
+                                            .responseRefId("")
+                                            .operation(OperationNameEnum.LOAN_QUERY)
+                                            .build())
+                                    .body(loanQueryResponseDtos)
+                            .build();
+                });
+    }
+
+    private Flux<Loan> getAllByCustomerIdAndStatus(UUID userId, LoanStatusEnum loanStatus) {
+        if (loanStatus == null) {
+            return loanRepository.findAllByCustomerId(userId);
+        }
+        return loanRepository.findAllByCustomerIdAndStatus(userId, loanStatus);
     }
 }

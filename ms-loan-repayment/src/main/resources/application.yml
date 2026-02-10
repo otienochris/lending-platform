@@ -94,7 +94,7 @@ app:
           resourceId: ${spring.application.name}
           principalAttribute: preferred_username
           issuerUri: http://localhost:4011
-          jwkSetUri: ${app.service-properties.orchestrator-properties.securityConfigSpec.jwtSpec.issuerUri}/.well-known/jwks.json
+          jwkSetUri: ${app.service-properties.loan-repayment-properties.securityConfigSpec.jwtSpec.issuerUri}/.well-known/jwks.json
 
 
 
