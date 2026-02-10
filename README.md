@@ -148,7 +148,7 @@ The platform is designed to be run locally using **Docker Compose**, which spins
 ### 1️⃣ Clone the Repository
 
 ```bash
-git clone https://github.com/your-username/lending-platform.git
+git clone https://github.com/otienochris/lending-platform.git
 cd lending-platform
 ```
 
