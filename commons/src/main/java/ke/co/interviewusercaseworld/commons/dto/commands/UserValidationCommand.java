@@ -14,4 +14,6 @@ import java.util.UUID;
 public class UserValidationCommand {
     private UUID commandId;
     private UUID userId;
+    private String status;
+    private String message;
 }

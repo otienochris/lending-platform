@@ -19,6 +19,17 @@ public class AppProperties {
 
     private ProductConfigsProperties productConfiguration;
     private OrchestratorProperties orchestratorProperties;
+    private AuthServerProperties authServerProperties;
+
+    @Data
+    @Builder
+    @AllArgsConstructor
+    @NoArgsConstructor
+    public static class AuthServerProperties {
+        private SecurityConfigSpec securityConfigSpec;
+        private Map<String, ServiceSetup> externalMicroServices;
+        private KafkaConfigs kafkaConfigs;
+    }
 
     @Data
     @Builder

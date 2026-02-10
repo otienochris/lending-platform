@@ -3,6 +3,16 @@ server:
 spring:
   application:
     name: ${AUTH_APP_NAME}
+  kafka:
+    bootstrap-servers: localhost:9092
+    consumer:
+      group-id: auth-server
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
   r2dbc:
     url: r2dbc:postgresql://localhost:5432
     name: lending_platform
@@ -42,6 +52,12 @@ logging:
     file: "%d{yyyy-MM-dd HH:mm:ss.SSS} | severity=%5p | application=${spring.application.name} | thread=%15.15t | %m%n"
     console: "%d{yyyy-MM-dd HH:mm:ss.SSS} | severity=%5p | application=${spring.application.name} | thread=%15.15t | %m%n"
 app:
+  service-properties:
+    auth-server-properties:
+      kafka-configs:
+        topics-for-command:
+          USER_VALIDATION_COMMAND: "user.validation.command"
+          USER_VALIDATION_EVENT: "user.validation.event"
   securityConfigSpec:
     whitelistedPaths:
       - "/.well-known/jwks.json"
