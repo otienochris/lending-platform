@@ -80,48 +80,43 @@ services:
       KAFKA_BROKERCONNECT: "kafka:29092"
     networks:
       - default
-#      KAFKA_BROKERCONNECT=localhost:9092
-#  crmService:
-#    image: expd/${CRM_APP_NAME}
-#    container_name: ${CRM_APP_NAME}
-#    ports:
-#      - ${CRM_PORT}:${CRM_PORT}
-#    depends_on:
-#      - postgresql
-#      - service-discovery
-#      - authorization-service
-#    env_file:
-#      - .env
+  auth-server:
+    build: ./auth-server
+    depends_on:
+      - postgres
+    ports:
+      - "9000:9000"
 
-#  gatewayService:
-#    image: expd/${GATEWAY_APP_NAME}
-#    container_name: ${GATEWAY_APP_NAME}
-#    ports:
-#      - ${GATEWAY_PORT}:${GATEWAY_PORT}
-#    env_file:
-#      - .env
-#    depends_on:
-#      - service-discovery
+  orchestrator:
+    build: ./orchestrator
+    depends_on:
+      - kafka
+      - postgres
+    ports:
+      - "8080:8080"
 
+  loan-disbursement:
+    build: ./loan-disbursement
+    depends_on:
+      - kafka
+      - postgres
 
-#  notificationService:
-#    image: expd/${NOTIFICATION_APP_NAME}
-#    container_name: ${NOTIFICATION_APP_NAME}
-#    ports:
-#      - ${NOTIFICATION_PORT}:${NOTIFICATION_PORT}
-#    depends_on:
-#      - postgresql
-#      - service-discovery
-#    env_file:
-#      - .env
-#
-#  service-discovery:
-#    image: expd/${EUREKA_APP_NAME}
-#    container_name: service-discovery
-#    ports:
-#      - ${EUREKA_PORT}:${EUREKA_PORT}
-#    env_file:
-#      - .env
+  loan-repayment:
+    build: ./loan-repayment
+    depends_on:
+      - kafka
+      - postgres
+
+  product-configuration:
+    build: ./product-configuration
+    depends_on:
+      - postgres
+
+  crm:
+    build: ./crm
+    depends_on:
+      - postgres
+
 
   pgadmin:
     image: dpage/pgadmin4
