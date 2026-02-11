@@ -481,44 +481,6 @@ public class EventListeners {
                                                 .eventType(CommandsEnum.REPAYMENT_COMMAND.name())
                                                 .build();
 
-                                        /*String message = finalRepaymentEvent.getMessage();
-                                        Helpers.log("loan.repayment.prevalidation.event", LogLevelEnum.INFO, OperationNameEnum.KAFKA_CONSUMER, "Sending notification event: " + message, null);
-                                        NotificationCommand notificationCommand = NotificationCommand.builder()
-                                                .commandId(loanId)
-                                                .types(List.of(NotificationTypeEnum.SMS, NotificationTypeEnum.EMAIL))
-                                                .template("REPAYMENT_SUCCESSFUL_TEMPLATE")
-                                                .principal(NotificationCommand.Recipient.builder().build())
-                                                .templateParamValues(Map.of("CUSTOMER_MESSAGE", message == null ? "Disbursement failed" : message, "amount", originalRequest.getBody().getAmount().toString()))
-                                                .build();
-                                        payloadString = objectMapper.writeValueAsString(notificationCommand);
-                                        outBoxEvent = OutBoxEvent.builder()
-                                                .aggregateType(LOAN_AGGREGATE)
-                                                .aggregateId(loanId.toString())
-                                                .createdAt(now())
-                                                .isPublished(false)
-                                                .payload(payloadString)
-                                                .eventType(CommandsEnum.NOTIFY_EVENT.name())
-                                                .build();
-
-                                        String message = finalRepaymentEvent.getMessage();
-                                        Helpers.log("loan.repayment.prevalidation.event", LogLevelEnum.INFO, OperationNameEnum.KAFKA_CONSUMER, "Sending notification event: " + message, null);
-                                        NotificationCommand notificationCommand = NotificationCommand.builder()
-                                                .commandId(loanId)
-                                                .types(List.of(NotificationTypeEnum.SMS, NotificationTypeEnum.EMAIL))
-                                                .template("REPAYMENT_FAILED_TEMPLATE")
-                                                .principal(NotificationCommand.Recipient.builder().build())
-                                                .templateParamValues(Map.of("CUSTOMER_MESSAGE", message == null ? "Disbursement failed" : message))
-                                                .build();
-                                        payloadString = objectMapper.writeValueAsString(notificationCommand);
-                                        outBoxEvent = OutBoxEvent.builder()
-                                                .aggregateType(LOAN_AGGREGATE)
-                                                .aggregateId(loanId.toString())
-                                                .createdAt(now())
-                                                .isPublished(false)
-                                                .payload(payloadString)
-                                                .eventType(CommandsEnum.NOTIFY_EVENT.name())
-                                                .build();
-                                    */
                                 }
                             } catch (Exception e) {
                                 Helpers.log("", LogLevelEnum.ERROR, OperationNameEnum.KAFKA_CONSUMER, "Error creating notification command", e);
