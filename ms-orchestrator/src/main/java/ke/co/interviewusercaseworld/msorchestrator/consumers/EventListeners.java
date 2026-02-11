@@ -3,6 +3,7 @@ package ke.co.interviewusercaseworld.msorchestrator.consumers;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import ke.co.interviewusercaseworld.commons.dto.commands.DisbursementCommand;
+import ke.co.interviewusercaseworld.commons.dto.commands.NotificationCommand;
 import ke.co.interviewusercaseworld.commons.dto.commands.RepaymentCommand;
 import ke.co.interviewusercaseworld.commons.dto.commands.RepaymentSchedulingCommand;
 import ke.co.interviewusercaseworld.commons.dto.events.*;
@@ -12,7 +13,6 @@ import ke.co.interviewusercaseworld.commons.enums.*;
 import ke.co.interviewusercaseworld.commons.utils.Helpers;
 import ke.co.interviewusercaseworld.msorchestrator.model.dto.request.LoanApplicationRequest;
 import ke.co.interviewusercaseworld.msorchestrator.model.dto.request.LoanRepaymentRequest;
-import ke.co.interviewusercaseworld.msorchestrator.model.dto.request.commands.NotificationCommand;
 import ke.co.interviewusercaseworld.msorchestrator.model.dto.request.commands.UserValidationCommand;
 import ke.co.interviewusercaseworld.msorchestrator.model.entities.OutBoxEvent;
 import ke.co.interviewusercaseworld.msorchestrator.model.entities.Saga;
@@ -33,6 +33,7 @@ import java.util.Map;
 import java.util.UUID;
 
 import static java.time.LocalDateTime.now;
+import static ke.co.interviewusercaseworld.commons.enums.NotificationTemplateEnum.*;
 import static ke.co.interviewusercaseworld.msorchestrator.service.impl.LoanServiceImpl.LOAN_VALIDATION_STEP;
 
 @Component
@@ -91,8 +92,8 @@ public class EventListeners {
                                 NotificationCommand notificationCommand = NotificationCommand.builder()
                                         .commandId(loanId)
                                         .types(List.of(NotificationTypeEnum.SMS, NotificationTypeEnum.EMAIL))
-                                        .template("PRODUCT_VALIDATION_FAILED_TEMPLATE")
-                                        .principal(NotificationCommand.Recipient.builder().build())
+                                        .template(PRODUCT_VALIDATION_FAILED_TEMPLATE)
+                                        .recipient(NotificationCommand.Recipient.builder().msisdn("254742887480").to(List.of("abc@xyz.com")).build())
                                         .templateParamValues(Map.of("CUSTOMER_MESSAGE", message == null ? "Product validation failed" : message))
                                         .build();
 
@@ -174,8 +175,8 @@ public class EventListeners {
                                     NotificationCommand notificationCommand = NotificationCommand.builder()
                                             .commandId(loanId)
                                             .types(List.of(NotificationTypeEnum.SMS, NotificationTypeEnum.EMAIL))
-                                            .template("USER_VALIDATION_FAILED_TEMPLATE")
-                                            .principal(NotificationCommand.Recipient.builder().build())
+                                            .template(USER_VALIDATION_FAILED_TEMPLATE)
+                                            .recipient(NotificationCommand.Recipient.builder().msisdn("254742887480").to(List.of("abc@xyz.com")).build())
                                             .templateParamValues(Map.of("CUSTOMER_MESSAGE", userValidationEvent.getMessage()))
                                             .build();
                                     payloadString = objectMapper.writeValueAsString(notificationCommand);
@@ -266,8 +267,8 @@ public class EventListeners {
                                     NotificationCommand notificationCommand = NotificationCommand.builder()
                                             .commandId(loanId)
                                             .types(List.of(NotificationTypeEnum.SMS, NotificationTypeEnum.EMAIL))
-                                            .template("DISBURSAL_FAILED_TEMPLATE")
-                                            .principal(NotificationCommand.Recipient.builder().build())
+                                            .template(DISBURSAL_FAILED_TEMPLATE)
+                                            .recipient(NotificationCommand.Recipient.builder().msisdn("254742887480").to(List.of("abc@xyz.com")).build())
                                             .templateParamValues(Map.of("CUSTOMER_MESSAGE", message == null ? "Disbursement failed" : message))
                                             .build();
                                     payloadString = objectMapper.writeValueAsString(notificationCommand);
@@ -360,21 +361,21 @@ public class EventListeners {
                                     NotificationCommand notificationCommand = NotificationCommand.builder()
                                             .commandId(loanId)
                                             .types(List.of(NotificationTypeEnum.SMS, NotificationTypeEnum.EMAIL))
-                                            .template("REPAYMENT_FAILED_TEMPLATE")
-                                            .principal(NotificationCommand.Recipient.builder().build())
+                                            .template(REPAYMENT_FAILED_TEMPLATE)
+                                            .recipient(NotificationCommand.Recipient.builder().msisdn("254742887480").to(List.of("abc@xyz.com")).build())
                                             .templateParamValues(Map.of("CUSTOMER_MESSAGE", message == null ? "Disbursement failed" : message))
                                             .build();
                                     payloadString = objectMapper.writeValueAsString(notificationCommand);
                                 } else {
                                     NotificationCommand command = NotificationCommand.builder()
                                             .commandId(loanId)
-                                            .template("SUCCESSFUL_LOAN_DISBURSEMENT")
+                                            .template(SUCCESSFUL_LOAN_DISBURSEMENT)
                                             .types(List.of(NotificationTypeEnum.SMS, NotificationTypeEnum.EMAIL))
                                             .templateParamValues(Map.of(
                                                     "AMOUNT", finalRepaymentSchedulingEvent.getTotalLoanAmount(),
                                                     "DUE_DATE", finalRepaymentSchedulingEvent.getDueDate(),
                                                     "TOTAL_INTEREST", finalRepaymentSchedulingEvent.getTotalInterest()))
-                                            .principal(NotificationCommand.Recipient.builder()
+                                            .recipient(NotificationCommand.Recipient.builder()
                                                     .msisdn("254742887480")
                                                     .to(List.of("ohtischris@gmail.com"))
                                                     .build())
@@ -446,8 +447,8 @@ public class EventListeners {
                                     NotificationCommand notificationCommand = NotificationCommand.builder()
                                             .commandId(loanId)
                                             .types(List.of(NotificationTypeEnum.SMS, NotificationTypeEnum.EMAIL))
-                                            .template("REPAYMENT_PREVALIDATION_FAILED_TEMPLATE")
-                                            .principal(NotificationCommand.Recipient.builder().build())
+                                            .template(REPAYMENT_PREVALIDATION_FAILED_TEMPLATE)
+                                            .recipient(NotificationCommand.Recipient.builder().msisdn("254742887480").to(List.of("abc@xyz.com")).build())
                                             .templateParamValues(Map.of("CUSTOMER_MESSAGE", message == null ? "Disbursement failed" : message))
                                             .build();
                                     payloadString = objectMapper.writeValueAsString(notificationCommand);
@@ -540,8 +541,8 @@ public class EventListeners {
                                     NotificationCommand notificationCommand = NotificationCommand.builder()
                                             .commandId(loanId)
                                             .types(List.of(NotificationTypeEnum.SMS, NotificationTypeEnum.EMAIL))
-                                            .template("REPAYMENT_PREVALIDATION_FAILED_TEMPLATE")
-                                            .principal(NotificationCommand.Recipient.builder().build())
+                                            .template(REPAYMENT_PREVALIDATION_FAILED_TEMPLATE)
+                                            .recipient(NotificationCommand.Recipient.builder().msisdn("254742887480").to(List.of("abc@xyz.com")).build())
                                             .templateParamValues(Map.of("CUSTOMER_MESSAGE", message == null ? "Disbursement failed" : message))
                                             .build();
                                     payloadString = objectMapper.writeValueAsString(notificationCommand);
@@ -551,7 +552,7 @@ public class EventListeners {
                                             .createdAt(now())
                                             .isPublished(false)
                                             .payload(payloadString)
-                                            .eventType(CommandsEnum.NOTIFY_EVENT.name())
+                                            .eventType(CommandsEnum.NOTIFY_COMMAND.name())
                                             .build();
                                 } else {
                                     Helpers.log("loan.repayment.event", LogLevelEnum.INFO, OperationNameEnum.KAFKA_CONSUMER, "saving loan repayment command" + finalRepaymentEvent.getMessage(), null);
@@ -562,8 +563,8 @@ public class EventListeners {
                                     NotificationCommand notificationCommand = NotificationCommand.builder()
                                             .commandId(loanId)
                                             .types(List.of(NotificationTypeEnum.SMS, NotificationTypeEnum.EMAIL))
-                                            .template("REPAYMENT_SUCCESSFUL_TEMPLATE")
-                                            .principal(NotificationCommand.Recipient.builder().build())
+                                            .template(REPAYMENT_SUCCESSFUL_TEMPLATE)
+                                            .recipient(NotificationCommand.Recipient.builder().msisdn("254742887480").to(List.of("abc@xyz.com")).build())
                                             .templateParamValues(Map.of("CUSTOMER_MESSAGE", message == null ? "Repayment success" : message, "amount", originalRequest.getBody().getAmount().toString()))
                                             .build();
                                     payloadString = objectMapper.writeValueAsString(notificationCommand);
@@ -573,32 +574,10 @@ public class EventListeners {
                                             .createdAt(now())
                                             .isPublished(false)
                                             .payload(payloadString)
-                                            .eventType(CommandsEnum.NOTIFY_EVENT.name())
+                                            .eventType(CommandsEnum.NOTIFY_COMMAND.name())
                                             .build();
 
-                                        /*String message = finalRepaymentEvent.getMessage();
-                                        Helpers.log("loan.repayment.event", LogLevelEnum.INFO, OperationNameEnum.KAFKA_CONSUMER, "Sending notification event: " + message, null);
 
-
-                                        String message = finalRepaymentEvent.getMessage();
-                                        Helpers.log("loan.repayment.event", LogLevelEnum.INFO, OperationNameEnum.KAFKA_CONSUMER, "Sending notification event: " + message, null);
-                                        NotificationCommand notificationCommand = NotificationCommand.builder()
-                                                .commandId(loanId)
-                                                .types(List.of(NotificationTypeEnum.SMS, NotificationTypeEnum.EMAIL))
-                                                .template("REPAYMENT_FAILED_TEMPLATE")
-                                                .principal(NotificationCommand.Recipient.builder().build())
-                                                .templateParamValues(Map.of("CUSTOMER_MESSAGE", message == null ? "Disbursement failed" : message))
-                                                .build();
-                                        payloadString = objectMapper.writeValueAsString(notificationCommand);
-                                        outBoxEvent = OutBoxEvent.builder()
-                                                .aggregateType(LOAN_AGGREGATE)
-                                                .aggregateId(loanId.toString())
-                                                .createdAt(now())
-                                                .isPublished(false)
-                                                .payload(payloadString)
-                                                .eventType(CommandsEnum.NOTIFY_EVENT.name())
-                                                .build();
-                                    */
                                 }
                             } catch (Exception e) {
                                 Helpers.log("", LogLevelEnum.ERROR, OperationNameEnum.KAFKA_CONSUMER, "Error creating notification command", e);
@@ -618,7 +597,7 @@ public class EventListeners {
 
     @KafkaListener(topics = {"notification.event"}, groupId = "orchestrator")
     public Mono<Void> onNotificationEvent(String payload) {
-        Helpers.log("", LogLevelEnum.INFO, OperationNameEnum.KAFKA_CONSUMER, "Received message from notification.event", null);
+        Helpers.log("", LogLevelEnum.INFO, OperationNameEnum.KAFKA_CONSUMER, "Received message from notification.event: " + payload, null);
         NotificationEvent repaymentEvent;
         try {
             repaymentEvent = objectMapper.readValue(payload, NotificationEvent.class);

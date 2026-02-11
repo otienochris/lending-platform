@@ -13,7 +13,7 @@ import ke.co.interviewusercaseworld.repayment.model.dto.response.LoanQueryRespon
 import ke.co.interviewusercaseworld.repayment.model.dto.response.LoanRepaymentSchedulingResponse;
 import ke.co.interviewusercaseworld.repayment.model.dto.response.LoanValidationOrRepaymentResponseDto;
 import ke.co.interviewusercaseworld.repayment.model.entities.Loan;
-import ke.co.interviewusercaseworld.repayment.model.entities.LoanRepository;
+import ke.co.interviewusercaseworld.repayment.repository.LoanRepository;
 import ke.co.interviewusercaseworld.repayment.model.entities.Repayment;
 import ke.co.interviewusercaseworld.repayment.model.entities.RepaymentSchedule;
 import ke.co.interviewusercaseworld.repayment.repository.RepaymentScheduleRepository;

@@ -1,6 +1,7 @@
 package ke.co.interviewusercaseworld.commons.dto.commands;
 
 import ke.co.interviewusercaseworld.commons.enums.InterestRateTypeEnum;
+import ke.co.interviewusercaseworld.commons.enums.NotificationTemplateEnum;
 import ke.co.interviewusercaseworld.commons.enums.NotificationTypeEnum;
 import ke.co.interviewusercaseworld.commons.enums.TenureOptionsTypeEnum;
 import lombok.AllArgsConstructor;
@@ -8,6 +9,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -19,13 +21,10 @@ import java.util.UUID;
 public class NotificationCommand {
     private List<NotificationTypeEnum> types;
     private UUID commandId;
-    private String template;
+    private NotificationTemplateEnum template;
     private Map<String, Object> templateParamValues;
-    private Recipient principal;
-    private String interestRate;
-    private InterestRateTypeEnum interestRateType;
-    private Integer tenure;
-    private TenureOptionsTypeEnum tenureType;
+    private Recipient recipient;
+    private LocalDateTime scheduledDate;
 
     @Data
     @Builder

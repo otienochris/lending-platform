@@ -1,0 +1,47 @@
+package ke.co.interviewusercasesworld.msnotification.publisher;
+
+import ke.co.interviewusercasesworld.msnotification.configs.NotificationConfigsProperties;
+import ke.co.interviewusercasesworld.msnotification.model.entity.OutboxEvent;
+import ke.co.interviewusercasesworld.msnotification.repository.OutBoxEventRepository;
+import ke.co.interviewusercaseworld.commons.enums.CommandsEnum;
+import ke.co.interviewusercaseworld.commons.enums.LogLevelEnum;
+import ke.co.interviewusercaseworld.commons.enums.OperationNameEnum;
+import ke.co.interviewusercaseworld.commons.utils.Helpers;
+import lombok.RequiredArgsConstructor;
+import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.stereotype.Service;
+import reactor.core.publisher.Mono;
+
+
+@Service
+@RequiredArgsConstructor
+public class OutboxPublisher {
+    private final OutBoxEventRepository outboxRepo;
+    private final KafkaTemplate<String, String> kafka;
+    private final NotificationConfigsProperties appProperties;
+
+
+    @Scheduled(fixedDelay = 30000)
+    public void publishOutboxEvent(){
+
+        outboxRepo.findTop20ByIsPublishedFalse()
+                .flatMap(outBoxEvent -> {
+                    CommandsEnum commandsEnum = CommandsEnum.valueOf(outBoxEvent.getEventType());
+                    String topic = appProperties.getServiceProperties().getNotificationProperties().getKafkaConfigs().getTopicsForCommand().getOrDefault(commandsEnum, "");
+                    Helpers.log("PUBLISH_OUT_BOX_EVENT:" + commandsEnum, LogLevelEnum.info, OperationNameEnum.PUBLISH_OUTBOX_EVENTS_TASK, "publishing outbox events to topic: " + topic, null);
+                    if (!topic.isEmpty()) {
+                        return Mono.fromFuture(kafka.send(topic, outBoxEvent.getAggregateId(), outBoxEvent.getPayload()))
+                                .then(markAsPublished(outBoxEvent));
+                    }
+                    return Mono.empty();
+                }).subscribe();
+
+    }
+
+    private Mono<Void> markAsPublished(OutboxEvent e) {
+        Helpers.log("PUBLISH_OUT_BOX_EVENT", LogLevelEnum.info, OperationNameEnum.PUBLISH_OUTBOX_EVENTS_TASK, "marking outbox event as published", null);
+        e.setPublished(true);
+        return outboxRepo.save(e).then();
+    }
+}

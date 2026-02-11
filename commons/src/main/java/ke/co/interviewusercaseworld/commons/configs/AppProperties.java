@@ -1,8 +1,6 @@
 package ke.co.interviewusercaseworld.commons.configs;
 
-import ke.co.interviewusercaseworld.commons.enums.AuthTypeEnum;
-import ke.co.interviewusercaseworld.commons.enums.CommandsEnum;
-import ke.co.interviewusercaseworld.commons.enums.HttpVerbEnum;
+import ke.co.interviewusercaseworld.commons.enums.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -22,7 +20,32 @@ public class AppProperties {
     private AuthServerProperties authServerProperties;
     private LoanDisbursementProperties loanDisbursementProperties;
     private LoanRepaymentProperties loanRepaymentProperties;
+    private NotificationProperties notificationProperties;
 
+    @Data
+    @Builder
+    @AllArgsConstructor
+    @NoArgsConstructor
+    public static class NotificationProperties {
+        private SecurityConfigSpec securityConfigSpec;
+        private Map<String, ServiceSetup> externalMicroServices;
+        private KafkaConfigs kafkaConfigs;
+        private Map<NotificationTemplateEnum, Map<NotificationTypeEnum, TemplateDetails>> notificationTemplates;
+    }
+
+    @Data
+    @Builder
+    @AllArgsConstructor
+    @NoArgsConstructor
+    public static class TemplateDetails {
+
+        private NotificationTemplateEnum name;
+        private String subject;
+        private String template;
+        private String from;
+        private Map<String, Object> paramValues;
+
+    }
 
     @Data
     @Builder
@@ -33,6 +56,7 @@ public class AppProperties {
         private Map<String, ServiceSetup> externalMicroServices;
         private KafkaConfigs kafkaConfigs;
     }
+
     @Data
     @Builder
     @AllArgsConstructor

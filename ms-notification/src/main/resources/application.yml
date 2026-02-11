@@ -1,3 +1,5 @@
+server:
+  port: 8087
 spring:
   application:
     name: ms-notification
@@ -6,14 +8,143 @@ spring:
       enabled: false
   r2dbc:
     url: r2dbc:postgresql://localhost:5432
-    name: notification
+    name: crm
     username: apis
     password: apis
     pool:
       enabled: true
+
+  kafka:
+    bootstrap-servers: localhost:9092
+    consumer:
+      group-id: notifications
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          #          issuer-uri: ${misc.keycloak.baseurl}/realms/${misc.keycloak.realm}
+          issuer-uri: http://localhost:4011
+          jwk-set-uri: ${spring.security.oauth2.resourceserver.jwt.issuer-uri}/.well-known/jwks.json
+      client:
+        registration:
+          keycloak:
+            client-id: ${sping.application.name}
+            authorization-grant-type: authorization_code
+            scope:
+              - openid
+        provider:
+          keycloak:
+            issuer-uri: ${spring.security.oauth2.resourceserver.jwt.issuer-uri}
+            user-name-attribute: preferred_username
+
 eureka:
   client:
     serviceUrl:
       defaultZone: http://localhost:8761/eureka
     register-with-eureka: false
     fetch-registry: false
+logging:
+  file: logs/${spring.application.name}.logs
+
+  max-size: 10MB
+  max-history: 30
+  pattern:
+    file: "%d{yyyy-MM-dd HH:mm:ss.SSS} | severity=%5p | application=${spring.application.name} | thread=%15.15t | %m%n"
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} | severity=%5p | application=${spring.application.name} | thread=%15.15t | %m%n"
+
+
+
+app:
+  service-properties:
+    notification-properties:
+      notification-templates:
+        PRODUCT_VALIDATION_FAILED_TEMPLATE:
+          SMS:
+            template: "Dear Customer, Your loan application has been rejected. {{RESON}}"
+          EMAIL:
+            template: "Dear Customer, Your loan application has been rejected. {{RESON}}"
+            subject: "Loan Application Rejected"
+            from: "Ezra"
+        USER_VALIDATION_FAILED_TEMPLATE:
+          SMS:
+            template: "Dear Customer, Your loan application has been rejected. {{RESON}}"
+          EMAIL:
+            template: "Dear Customer, Your loan application has been rejected. {{RESON}}"
+            subject: "Loan Application Rejected"
+            from: "Ezra"
+        DISBURSAL_FAILED_TEMPLATE:
+          SMS:
+            template: "Dear Customer, Your loan application has failed. {{RESON}}"
+          EMAIL:
+            template: "Dear Customer, Your loan application has failed. {{RESON}}"
+            subject: "Loan Application Failed"
+            from: "Ezra"
+        REPAYMENT_FAILED_TEMPLATE:
+          SMS:
+            template: "Dear Customer, Your loan repayment has failed. {{RESON}}"
+          EMAIL:
+            template: "Dear Customer, Your loan repayment has failed. {{RESON}}"
+            subject: "Loan Repayment Failed"
+            from: "Ezra"
+        SUCCESSFUL_LOAN_DISBURSEMENT:
+          SMS:
+            template: "Dear Customer, Your loan has been successfully disbursed. {{CURRENCY}} {{LOAN_AMOUNT}} has been credited to your {{CHANNEL}} account. Your due date is {{DUE_DATE}}"
+          EMAIL:
+            template: "Dear Customer, Your loan has been successfully disbursed. {{CURRENCY}} {{LOAN_AMOUNT}} has been credited to your {{CHANNEL}} account. Your due date is {{DUE_DATE}}"
+            subject: "Loan Disbursed"
+            from: "Ezra"
+        REPAYMENT_PREVALIDATION_FAILED_TEMPLATE:
+          SMS:
+            template: "Dear Customer, Your repayment has been rejected. {{RESON}}"
+          EMAIL:
+            template: "Dear Customer, Your repayment has been rejected. {{RESON}}"
+            subject: "Loan Repayment Rejected"
+            from: "Ezra"
+        REPAYMENT_SUCCESSFUL_TEMPLATE:
+          SMS:
+            template: "Dear Customer, Your repayment has been successful. {{CURRENCY}} {{AMOUNT}} has been deducted from your {{CHANNEL}} account to pay off the loan of {{LOAN_AMOUNT}}. Your current loan balance is {{BALANCE}}"
+          EMAIL:
+            template: "Dear Customer, Your repayment has been successful. {{CURRENCY}} {{AMOUNT}} has been deducted from your {{CHANNEL}} account to pay off the loan of {{LOAN_AMOUNT}}. Your current loan balance is {{BALANCE}}"
+            subject: "Loan Repayment Successful"
+            from: "Ezra"
+      kafka-configs:
+        topics-for-command:
+          NOTIFY_COMMAND: "notification.command"
+          NOTIFY_EVENT: "notification.event"
+
+      securityConfigSpec:
+        whitelistedPaths:
+          - "/actuator/health"
+          - "/actuator/info"
+          - "/v3/api-docs/**"
+          - "/swagger-ui.html"
+          - "/swagger-ui/**"
+          - "/webjars/**"
+        corsConfigs:
+          - mapping: "/**"
+            allowed-origins:
+              - http://localhost:3000
+              - http://localhost:8080
+            allowed-methods:
+              - GET
+              - POST
+              - OPTION
+              - DELETE
+              - PUT
+            allowed-headers:
+              - "*"
+            allow-credentials: true
+        jwtSpec:
+          resourceId: ${spring.application.name}
+          principalAttribute: preferred_username
+          issuerUri: http://localhost:4011
+          jwkSetUri: ${app.service-properties.notification-properties.securityConfigSpec.jwtSpec.issuerUri}/.well-known/jwks.json
+
+
+
