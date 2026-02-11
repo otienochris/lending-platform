@@ -313,25 +313,32 @@ create schema if not exists notifications;
 -- --------------------
 -- Notifications
 -- --------------------
-CREATE TABLE if not exists notifications.notifications (
-                                                           notification_id   UUID PRIMARY KEY,
-                                                           recipient         VARCHAR(100) NOT NULL,
+CREATE TABLE if not exists notifications.notifications (notification_id   UUID PRIMARY key DEFAULT uuid_generate_v4(),
+    msisdn         VARCHAR(100),
+    subject 		text,
+    emails_to		text,
+    cc			    text,
+    bcc			text,
     channel           VARCHAR(30) NOT NULL,
     template_code     VARCHAR(100) NOT NULL,
-    payload           JSONB NOT NULL,
+    payload           TEXT NOT NULL,
     status            VARCHAR(30) NOT NULL,
+    retry_count       integer default 0,
+    sent_at			TIMESTAMP,
+    send_at			TIMESTAMP,
     created_at        TIMESTAMP NOT NULL DEFAULT now()
     );
 
 -- --------------------
 -- Outbox (optional if async delivery)
 -- --------------------
+drop table notifications.outbox_events;
 CREATE TABLE if not exists notifications.outbox_events (
-                                                           event_id          UUID PRIMARY KEY,
-                                                           aggregate_type    VARCHAR(50) NOT NULL,
+                                                           event_id          UUID PRIMARY key DEFAULT uuid_generate_v4(),
+    aggregate_type    VARCHAR(50) NOT NULL,
     aggregate_id      VARCHAR(100),
     event_type        VARCHAR(100) NOT NULL,
-    payload           JSONB NOT NULL,
+    payload           TEXT NOT NULL,
     published         BOOLEAN NOT NULL DEFAULT FALSE,
     created_at        TIMESTAMP NOT NULL DEFAULT now()
     );
