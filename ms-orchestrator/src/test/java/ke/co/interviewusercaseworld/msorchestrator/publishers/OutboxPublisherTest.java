@@ -45,12 +45,6 @@ class OutboxPublisherTest {
     @BeforeEach
     void setup() {
 
-
-
-        /*when(appProperties.getServiceProperties().getOrchestratorProperties()).thenReturn(AppProperties.OrchestratorProperties.builder()
-                        .kafkaConfigs(AppProperties.KafkaConfigs.builder().topicsForCommand(topicMap).build())
-                        .securityConfigSpec(AppProperties.SecurityConfigSpec.builder().build())
-                .build());*/
     }
 
     @Test
