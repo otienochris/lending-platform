@@ -32,7 +32,7 @@ public class Notification {
     private String status;
     private Integer retryCount;
     private LocalDateTime createdAt;
-    private LocalDateTime sent_at;
+    private LocalDateTime sentAt;
     @Builder.Default
-    private LocalDateTime send_at = LocalDateTime.now();
+    private LocalDateTime sendAt = LocalDateTime.now();
 }

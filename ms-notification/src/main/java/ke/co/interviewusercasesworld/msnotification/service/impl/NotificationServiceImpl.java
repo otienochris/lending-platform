@@ -16,6 +16,7 @@ import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -70,6 +71,10 @@ public class NotificationServiceImpl implements NotificationService {
 
                             AppProperties.TemplateDetails details = templateDetails.get(type);
 
+                            LocalDateTime scheduledDate = notificationCommand.getScheduledDate();
+                            if (scheduledDate == null) {
+                                scheduledDate = LocalDateTime.now();
+                            }
                             Notification notification = Notification.builder()
                                     .channel(type.name())
                                     .templateCode(details.getTemplate())
@@ -78,7 +83,7 @@ public class NotificationServiceImpl implements NotificationService {
                                     .emailsTo(getConcatenatedEmails(notificationCommand.getRecipient().getTo()))
                                     .bcc(getConcatenatedEmails(notificationCommand.getRecipient().getBcc()))
                                     .cc(getConcatenatedEmails(notificationCommand.getRecipient().getCc()))
-                                    .send_at(notificationCommand.getScheduledDate())
+                                    .sendAt(scheduledDate)
                                     .payload(getPayload(details.getTemplate(), notificationCommand.getTemplateParamValues()))
                                     .build();
                             return notificationRepository.save(notification);
