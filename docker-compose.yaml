@@ -1,17 +1,17 @@
 #version: '3.8'
 services:
   postgresql:
-    image: postgres:18-alpine
+    image: postgres
     command: -c 'max_connections=1000'
     restart: unless-stopped
     ports:
       - "5432:5432"
     volumes:
-      - ~/apps/postgres:/var/lib/postgresql/data
+      - ~/apps/postgres:/var/lib/postgresql
     environment:
-      POSTGRES_PASSWORD: apis
-      POSTGRES_USER: apis
-      POSTGRES_DATABASES: "lending_platform"
+      POSTGRES_PASSWORD: "apis"
+      POSTGRES_USER: "apis"
+      POSTGRES_DB: "lending_platform"
     env_file:
       - .env
     networks:
@@ -55,21 +55,6 @@ services:
     networks:
       - default
 
-  akhq:
-    image: tchiotludo/akhq
-    container_name: akhq
-    depends_on:
-      - kafka
-    ports:
-      - "8080:8080"
-    environment:
-      AKHQ_CONFIGURATION: |
-        akhq:
-          connections:
-            local:
-              properties:
-                bootstrap.servers: "kafka:29092"
-
   kafdrop:
     image: obsidiandynamics/kafdrop
     restart: "no"
@@ -83,39 +68,53 @@ services:
   auth-server:
     build: ./auth-server
     depends_on:
-      - postgres
+      - postgresql
     ports:
       - "9000:9000"
 
   orchestrator:
-    build: ./orchestrator
+    build: ./ms-orchestrator
     depends_on:
       - kafka
-      - postgres
+      - postgresql
     ports:
       - "8080:8080"
 
   loan-disbursement:
-    build: ./loan-disbursement
+    build: ./ms-loan-disbursement
     depends_on:
       - kafka
-      - postgres
+      - postgresql
 
   loan-repayment:
-    build: ./loan-repayment
+    build: ./ms-loan-repayment
     depends_on:
       - kafka
-      - postgres
+      - postgresql
 
   product-configuration:
-    build: ./product-configuration
+    build: ./ms-product-configurations
     depends_on:
-      - postgres
+      - postgresql
+      - kafka
+
+  notification:
+    build: ./ms-notification
+    depends_on:
+      - postgresql
+      - kafka
+
+  gateway:
+    build: ./ms-gateway
+    depends_on:
+      - postgresql
+      - kafka
 
   crm:
-    build: ./crm
+    build: ./ms-crm
     depends_on:
-      - postgres
+      - postgresql
+      - kafka
 
 
   pgadmin:

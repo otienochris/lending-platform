@@ -21,6 +21,41 @@ public class AppProperties {
     private LoanDisbursementProperties loanDisbursementProperties;
     private LoanRepaymentProperties loanRepaymentProperties;
     private NotificationProperties notificationProperties;
+    private SchedulerProperties schedulerProperties;
+
+    @Data
+    @Builder
+    @AllArgsConstructor
+    @NoArgsConstructor
+    public static class SchedulerProperties {
+        private SecurityConfigSpec securityConfigSpec;
+        private Map<String, ServiceSetup> externalMicroServices;
+        private KafkaConfigs kafkaConfigs;
+        private JobRunnerConfig jobRunnerConfig;
+    }
+
+    @Data
+    @Builder
+    @AllArgsConstructor
+    @NoArgsConstructor
+    public static class JobRunnerConfig {
+
+        private DatasourceConfig datasource;
+
+    }
+
+    @Data
+    @Builder
+    @AllArgsConstructor
+    @NoArgsConstructor
+    public static class DatasourceConfig {
+
+        private String url;
+        private String username;
+        private String password;
+        private String driverClassName;
+
+    }
 
     @Data
     @Builder

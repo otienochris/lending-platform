@@ -5,7 +5,7 @@ spring:
     config:
       enabled: false
   datasource:
-    url: jdbc:postgresql://localhost:5432/crm
+    url: jdbc:postgresql://localhost:5432/lending_platform
     username: apis
     password: apis
 eureka:

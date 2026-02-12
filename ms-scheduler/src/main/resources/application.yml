@@ -1,9 +1,21 @@
+server:
+  port: 8088
 spring:
   application:
     name: ms-scheduler
   cloud:
     config:
       enabled: false
+  datasource:
+    url: jdbc:postgresql://localhost:5432/lending_platform
+    username: apis
+    password: apis
+    driverClassName: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 5
+      idle-timeout: 30000
+      connection-timeout: 20000
   r2dbc:
     url: r2dbc:postgresql://localhost:5432
     name: lending_platform
@@ -11,9 +23,143 @@ spring:
     password: apis
     pool:
       enabled: true
+  kafka:
+    bootstrap-servers: localhost:9092
+    consumer:
+      group-id: scheduler
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          #          issuer-uri: ${misc.keycloak.baseurl}/realms/${misc.keycloak.realm}
+          issuer-uri: http://localhost:4011
+          jwk-set-uri: ${spring.security.oauth2.resourceserver.jwt.issuer-uri}/.well-known/jwks.json
+      client:
+        registration:
+          keycloak:
+            client-id: ${sping.application.name}
+            authorization-grant-type: authorization_code
+            scope:
+              - openid
+        provider:
+          keycloak:
+            issuer-uri: ${spring.security.oauth2.resourceserver.jwt.issuer-uri}
+            user-name-attribute: preferred_username
 eureka:
   client:
     serviceUrl:
       defaultZone: http://localhost:8761/eureka
     register-with-eureka: false
     fetch-registry: false
+
+
+logging:
+  file: logs/${spring.application.name}.logs
+
+  max-size: 10MB
+  max-history: 30
+  pattern:
+    file: "%d{yyyy-MM-dd HH:mm:ss.SSS} | severity=%5p | application=${spring.application.name} | thread=%15.15t | %m%n"
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} | severity=%5p | application=${spring.application.name} | thread=%15.15t | %m%n"
+
+
+
+app:
+  service-properties:
+    scheduler-properties:
+      job-runner-config:
+        datasource:
+          url: jdbc:postgresql://localhost:5432/lending_platform
+          username: apis
+          password: apis
+          driverClassName: org.postgresql.Driver
+      kafka-configs:
+        topics-for-command:
+          NOTIFY_COMMAND: "notification.command"
+          NOTIFY_EVENT: "notification.event"
+
+      securityConfigSpec:
+        whitelistedPaths:
+          - "/actuator/health"
+          - "/actuator/info"
+          - "/v3/api-docs/**"
+          - "/swagger-ui.html"
+          - "/swagger-ui/**"
+          - "/webjars/**"
+        corsConfigs:
+          - mapping: "/**"
+            allowed-origins:
+              - http://localhost:3000
+              - http://localhost:8080
+            allowed-methods:
+              - GET
+              - POST
+              - OPTION
+              - DELETE
+              - PUT
+            allowed-headers:
+              - "*"
+            allow-credentials: true
+        jwtSpec:
+          resourceId: ${spring.application.name}
+          principalAttribute: preferred_username
+          issuerUri: http://localhost:4011
+          jwkSetUri: ${app.service-properties.scheduler-properties.securityConfigSpec.jwtSpec.issuerUri}/.well-known/jwks.json
+
+
+# job runr configs
+
+#jobrunr-datasource:
+#  url: jdbc:postgresql://localhost:5432/lending_platform
+#  username: apis
+#  password: apis
+#  driverClassName: org.postgresql.Driver
+#  hikari:
+#    maximum-pool-size: 20
+#    minimum-idle: 5
+#    idle-timeout: 30000
+#    connection-timeout: 20000
+
+jobrunr:
+  background-job-server:
+    enabled: true
+  dashboard:
+    port: 8089
+    enabled: true
+  database:
+    table-prefix: scheduler.
+    database-name: lending_platform
+    datasource: jobrunrDataSource
+  jobs:
+    default-number-of-retries: 3
+  job-scheduler:
+    enabled: true
+
+
+
+#jobrunr.database.skip-create=false
+#jobrunr.database.table-prefix= # allows to set a table prefix (e.g. schema  or schema and tableprefix for all tables. e.g. MYSCHEMA._jobrunr)
+#jobrunr.database.database-name=jobrunr # Override the default database name to use (e.g. use main application database)
+#jobrunr.database.datasource= # allows to specify a DataSource specifically for JobRunr
+#jobrunr.database.type= # if you have multiple supported storage providers available in your application (e.g. an SQL DataSource and a NoSQL one), it allows to specify which database to choose. Valid values are 'sql', 'mongodb'.
+#jobrunr.jobs.default-number-of-retries=10 #the default number of retries for a failing job
+#jobrunr.jobs.retry-back-off-time-seed=3 #the default time seed for the exponential back-off policy.
+#jobrunr.jobs.metrics.enabled=false #Micrometer integration - this was true in v5.
+#jobrunr.job-scheduler.enabled=true
+#jobrunr.background-job-server.enabled=false
+#jobrunr.background-job-server.worker-count= #this value normally is defined by the amount of CPU's that are available
+#jobrunr.background-job-server.poll-interval-in-seconds=15 #check for new work every 15 seconds
+#jobrunr.background-job-server.delete-succeeded-jobs-after=36h #succeeded jobs will go to the deleted state after 36 hours
+#jobrunr.background-job-server.permanently-delete-deleted-jobs-after=72h #deleted jobs will be deleted permanently after 72 hours
+#jobrunr.background-job-server.metrics.enabled=true # Micrometer integration: reports server metrics (cpu usage, memory usage, worker pool size, etc.)
+#jobrunr.dashboard.enabled=false
+#jobrunr.dashboard.port=8000 #the port on which to start the dashboard
+#jobrunr.miscellaneous.allow-anonymous-data-usage=true #this sends the amount of succeeded jobs for marketing purposes
+
+

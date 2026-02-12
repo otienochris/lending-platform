@@ -332,7 +332,6 @@ CREATE TABLE if not exists notifications.notifications (notification_id   UUID P
 -- --------------------
 -- Outbox (optional if async delivery)
 -- --------------------
-drop table notifications.outbox_events;
 CREATE TABLE if not exists notifications.outbox_events (
                                                            event_id          UUID PRIMARY key DEFAULT uuid_generate_v4(),
     aggregate_type    VARCHAR(50) NOT NULL,
