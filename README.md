@@ -20,6 +20,9 @@ The system follows a **microservices-first design**, where each service:
 * Is independently deployable
 * Communicates asynchronously via events
 
+  <img width="1267" height="781" alt="image" src="https://github.com/user-attachments/assets/aef91015-6f27-4579-bc05-715c3498cb47" />
+
+
 ### Key Services
 
 * **Saga Orchestrator**
