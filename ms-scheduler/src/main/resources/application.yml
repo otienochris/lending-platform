@@ -60,8 +60,11 @@ eureka:
 
 
 logging:
+  #  level:
+  #    org.springframework.r2dbc.core: DEBUG
+  #    org.springframework.data.r2dbc: DEBUG
+  #    io.r2dbc.spi: DEBUG
   file: logs/${spring.application.name}.logs
-
   max-size: 10MB
   max-history: 30
   pattern:
@@ -81,8 +84,22 @@ app:
           driverClassName: org.postgresql.Driver
       kafka-configs:
         topics-for-command:
+          DISBURSE_COMMAND: "loan.disbursement.command"
+          DISBURSE_EVENT: "loan.disbursement.event"
+          REPAYMENT_COMMAND: "loan.repayment.command"
+          ACTUAL_REPAYMENT_COMMAND: "loan.repayment.command"
+          REPAYMENT_EVENT: "loan.repayment.event"
+          REPAYMENT_SCHEDULING_COMMAND: "loan.repayment.scheduling.command"
+          REPAYMENT_SCHEDULING_EVENT: "loan.repayment.scheduling.event"
+          REPAYMENT_PREVALIDATION_COMMAND: "loan.repayment.prevalidation.command"
+          REPAYMENT_PREVALIDATION_EVENT: "loan.repayment.prevalidation.event"
           NOTIFY_COMMAND: "notification.command"
+          PRODUCT_VALIDATION_COMMAND: "product.validation.command"
+          USER_VALIDATION_COMMAND: "user.validation.command"
           NOTIFY_EVENT: "notification.event"
+          PRODUCT_VALIDATION_EVENT: "product.validation.event"
+          USER_VALIDATION_EVENT: "user.validation.event"
+
 
       securityConfigSpec:
         whitelistedPaths:
