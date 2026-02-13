@@ -1,5 +1,6 @@
 package ke.co.interviewusercaseworld.commons.utils;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import ke.co.interviewusercaseworld.commons.dto.requests.DefaultRequestHeader;
 import ke.co.interviewusercaseworld.commons.enums.LogLevelEnum;
 import ke.co.interviewusercaseworld.commons.enums.OperationNameEnum;
@@ -10,7 +11,6 @@ import org.springframework.stereotype.Component;
 import java.math.BigDecimal;
 import java.math.MathContext;
 import java.math.RoundingMode;
-import java.net.URI;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
@@ -19,6 +19,8 @@ import java.util.UUID;
 @RequiredArgsConstructor
 @Slf4j
 public class Helpers {
+
+    private static final ObjectMapper mapper = new ObjectMapper();
 
     public static void log(String requestRefId, LogLevelEnum level, OperationNameEnum operation, String message,  Exception e) {
 
@@ -42,35 +44,19 @@ public class Helpers {
             case debug,DEBUG -> log.debug("Operation={} | RequestRefId={} | Message={} | ErrorMessage={} ", operation,requestRefId, message, e.getMessage());
         }
     }
-    /**
-     * Get base URL from ServerHttpRequest
-     */
-    /*public static String getBaseUrl(ServerHttpRequest request) {
 
-        String scheme = request.getSslInfo() != null ? "https" : "http";
 
-        URI uri = request.getURI();
-
-        String host = uri.getHost();
-        int port = uri.getPort();
-
-        // Handle default ports
-        if (port == -1) {
-            port = scheme.equals("https") ? 443 : 80;
+    public static Object parseToObject(String json) {
+        if (json == null) {
+            return null;
         }
-
-        // Build URL
-        StringBuilder baseUrl = new StringBuilder();
-        baseUrl.append(scheme).append("://").append(host);
-
-        // Only include port if it's not standard for the scheme
-        if (!((scheme.equals("http") && port == 80) ||
-                (scheme.equals("https") && port == 443))) {
-            baseUrl.append(":").append(port);
+        try {
+            return mapper.readValue(json, Object.class);
+        } catch (Exception e) {
+            log.error("Failed to parse JSON: {}", json, e);
+            return null;
         }
-
-        return baseUrl.toString();
-    }*/
+    }
 
     public static DefaultRequestHeader getDefaultRequestHeaderObject(Map<String, String> headers) {
         String correlationId = headers.getOrDefault("X-Correlation-ID", "");

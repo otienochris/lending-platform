@@ -13,9 +13,9 @@ import ke.co.interviewusercaseworld.repayment.model.dto.response.LoanQueryRespon
 import ke.co.interviewusercaseworld.repayment.model.dto.response.LoanRepaymentSchedulingResponse;
 import ke.co.interviewusercaseworld.repayment.model.dto.response.LoanValidationOrRepaymentResponseDto;
 import ke.co.interviewusercaseworld.repayment.model.entities.Loan;
-import ke.co.interviewusercaseworld.repayment.repository.LoanRepository;
 import ke.co.interviewusercaseworld.repayment.model.entities.Repayment;
 import ke.co.interviewusercaseworld.repayment.model.entities.RepaymentSchedule;
+import ke.co.interviewusercaseworld.repayment.repository.LoanRepository;
 import ke.co.interviewusercaseworld.repayment.repository.RepaymentScheduleRepository;
 import ke.co.interviewusercaseworld.repayment.repository.RepaymentsRepository;
 import ke.co.interviewusercaseworld.repayment.services.FundTransfer;
@@ -157,6 +157,7 @@ public class LoanRepaymentServiceImpl implements LoanRepaymentService {
                         .flatMapMany(savedLoan -> createSchedule(request.getBody(), firstDueDate)
                         .flatMap(repaymentSchedule -> {
                             repaymentSchedule.setLoanId(savedLoan.getId());
+                            repaymentSchedule.setTotalPaid(BigDecimal.ZERO);
                             return repaymentScheduleRepository.save(repaymentSchedule);
                         })
                         .doOnError(throwable -> Helpers.log("", LogLevelEnum.error, OperationNameEnum.REPAYMENT_SCHEDULING, "", new RuntimeException(throwable))))
@@ -221,7 +222,7 @@ public class LoanRepaymentServiceImpl implements LoanRepaymentService {
     @Override
     public Mono<GenericResponse<DefaultResponseHeader, LoanValidationOrRepaymentResponseDto>> validateLoan(UUID loanScheduleId, UUID customerId) {
 
-        Helpers.log("", LogLevelEnum.info, OperationNameEnum.LOAN_REPAYMENT, "validationg loan schedule: " + loanScheduleId, null);
+        Helpers.log("", LogLevelEnum.info, OperationNameEnum.LOAN_REPAYMENT, "validating loan schedule: " + loanScheduleId, null);
         return repaymentScheduleRepository.findById(loanScheduleId).defaultIfEmpty(RepaymentSchedule.builder().build())
                 .flatMap(repaymentSchedule -> {
                     return loanRepository.findById(repaymentSchedule.getLoanId()).defaultIfEmpty(Loan.builder().build())

@@ -17,7 +17,6 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.time.LocalDateTime;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -125,7 +124,7 @@ public class NotificationServiceImpl implements NotificationService {
 
         String[] finalTemplate = {template};
         templateParamValues.forEach((k,v) -> {
-            finalTemplate[0] = template.replace("{{" + k + "}}", (String) v);
+            finalTemplate[0] = template.replace("{{" + k + "}}", String.valueOf(v));
         });
         return finalTemplate[0];
     }

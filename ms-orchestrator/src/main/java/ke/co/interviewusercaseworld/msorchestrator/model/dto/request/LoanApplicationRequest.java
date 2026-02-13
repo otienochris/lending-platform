@@ -20,6 +20,8 @@ public class LoanApplicationRequest {
     private String loanPurpose;
     private Integer tenure;
     @Builder.Default
+    private Integer installments = 1;
+    @Builder.Default
     private WalletTypeEnum walletType = WalletTypeEnum.MobileMoney;
     private String walletId;
     @Builder.Default

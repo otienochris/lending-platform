@@ -3,7 +3,6 @@ package ke.co.interviewusercaseworld.msorchestrator.service.impl;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import ke.co.interviewusercaseworld.commons.dto.commands.ProductValidationCommand;
 import ke.co.interviewusercaseworld.commons.dto.commands.RepaymentCommand;
-import ke.co.interviewusercaseworld.commons.dto.commands.RepaymentSchedulingCommand;
 import ke.co.interviewusercaseworld.commons.dto.requests.DefaultRequestHeader;
 import ke.co.interviewusercaseworld.commons.dto.requests.GenericRequest;
 import ke.co.interviewusercaseworld.commons.dto.responses.DefaultResponseHeader;
@@ -55,6 +54,22 @@ public class LoanServiceImpl implements LoanService {
         UUID sagaId = getSagaId(request.getHeader().getCorrelationId());
         UUID loanId = UUID.randomUUID();
 
+        LoanApplicationRequest loanApplicationRequest = request.getBody();
+        Boolean installmentRepayment = loanApplicationRequest.getInstallment();
+        if (installmentRepayment && loanApplicationRequest.getInstallments() == null) {
+
+            return Mono.just(GenericResponse.<DefaultResponseHeader, LoanApplicationAcknowledgement>builder()
+                    .header(DefaultResponseHeader.builder()
+                            .correlationId(sagaId)
+                            .responseRefId(request.getHeader().getRequestRefId())
+                            .responseCode(ResponseCodes.RC_400)
+                            .operation(OperationNameEnum.LOAN_APPLICATION)
+                            .customerMessage("Installment repayment is enabled but no installments were provided.")
+                            .debugMessage("Installment repayment is enabled but no installments were provided.")
+                            .build())
+                    .build());
+        }
+
         Saga saga = Saga.builder()
                 .sagaType(SagaTypeEnum.LOAN_APPLICATION.name())
                 .businessKey(loanId.toString())
@@ -66,13 +81,14 @@ public class LoanServiceImpl implements LoanService {
         SagaStep sagaStep = SagaStep.builder()
                 .stepName("PRODUCT_VALIDATION")
                 .status("REQUESTED")
+                .executedAt(LocalDateTime.now())
                 .build();
 
         ProductValidationCommand productValidationCommand = ProductValidationCommand.builder()
-                .productId(request.getBody().getProductId())
+                .productId(loanApplicationRequest.getProductId())
                 .commandId(loanId)
-                .loanAmount(request.getBody().getLoanAmount())
-                .installment(request.getBody().getInstallment())
+                .loanAmount(loanApplicationRequest.getLoanAmount())
+                .installment(installmentRepayment)
                 .build();
 
         OutBoxEvent outBoxEvent = OutBoxEvent.builder()
