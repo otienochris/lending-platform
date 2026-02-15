@@ -52,6 +52,14 @@ public class LoanRepaymentServiceImpl implements LoanRepaymentService {
     private final RepaymentsRepository repaymentsRepository;
     private final LoanRepaymentScheduleService loanRepaymentScheduleService;
 
+    private static BigDecimal getAmountToBePaid(RepaymentCommand repaymentCommand, RepaymentSchedule repaymentSchedule) {
+        BigDecimal amount = repaymentCommand.getAmount();
+        if (amount.compareTo(repaymentSchedule.getEmiAmount()) > 0) {
+            amount = repaymentSchedule.getEmiAmount(); // do not overpay
+        }
+        return amount;
+    }
+
     public Flux<RepaymentSchedule> createSchedule(
             LoanRepaymentSchedulingDto dto
     ) {
@@ -67,7 +75,6 @@ public class LoanRepaymentServiceImpl implements LoanRepaymentService {
         return dto.getTenure();
     }
 
-
     @Override
     public Mono<GenericResponse<DefaultResponseHeader, LoanRepaymentSchedulingResponse>> schedule(GenericRequest<DefaultResponseHeader, LoanRepaymentSchedulingDto> request) {
 
@@ -78,34 +85,39 @@ public class LoanRepaymentServiceImpl implements LoanRepaymentService {
                 .loanId(request.getBody().getLoanId())
                 .customerId(request.getBody().getCustomerId())
                 .principalAmount(principal)
-                .tenureMonths(resolveTenureInMonths(request.getBody()))
+                .tenure(request.getBody().getTenure())
                 .status(LoanStatusEnum.OPEN.name())
                 .createdAt(LocalDateTime.now())
                 .outstandingAmount(principal) // todo
                 .build();
         return operator.transactional(
-                loanRepository.save(loan)
-                        .flatMapMany(savedLoan -> createSchedule(request.getBody())
-                        .flatMap(repaymentSchedule -> {
-                            repaymentSchedule.setLoanId(savedLoan.getId());
-                            repaymentSchedule.setTotalPaid(BigDecimal.ZERO);
-                            return repaymentScheduleRepository.save(repaymentSchedule);
-                        })
-                        .doOnError(throwable -> Helpers.log("", LogLevelEnum.error, OperationNameEnum.REPAYMENT_SCHEDULING, "", new RuntimeException(throwable))))
-                ).collectList()
-                .flatMap(repaymentSchedule -> {
-                    if (repaymentSchedule.isEmpty()) {
+                        loanRepository.save(loan)
+                                .flatMap(savedLoan -> createSchedule(request.getBody())
+                                        .flatMap(repaymentSchedule -> {
+                                            repaymentSchedule.setLoanId(savedLoan.getId());
+                                            repaymentSchedule.setTotalPaid(BigDecimal.ZERO);
+                                            return repaymentScheduleRepository.save(repaymentSchedule); // save repayment schedule
+                                        })
+                                        .collectList()
+                                        .flatMap(repaymentSchedules -> {
+                                            BigDecimal outstandingAmount = repaymentSchedules.stream().map(RepaymentSchedule::getInterestComponent).reduce(BigDecimal.ZERO, BigDecimal::add);
+                                            loan.setOutstandingAmount(principal.add(outstandingAmount)); // set total outstanding balance
+                                            return loanRepository.save(loan);
+                                        })
+                                        .doOnError(throwable -> Helpers.log("", LogLevelEnum.error, OperationNameEnum.REPAYMENT_SCHEDULING, "", new RuntimeException(throwable))))
+                )
+                .flatMap(savedLoan -> {
+                    if (savedLoan.getId() == null) {
                         return Mono.just(GenericResponse.<DefaultResponseHeader, LoanRepaymentSchedulingResponse>builder()
                                 .header(DefaultResponseHeader.builder()
-                                        .customerMessage("No repayment schedule created")
+                                        .customerMessage("Loan creation failed")
                                         .responseCode(ResponseCodes.RC_400)
                                         .responseRefId("")
                                         .operation(request.getHeader().getOperation())
                                         .build())
                                 .build());
                     }
-                    BigDecimal totalInterest = repaymentSchedule.stream().map(RepaymentSchedule::getInterestComponent).reduce(BigDecimal.ZERO, BigDecimal::add);
-                    BigDecimal totalOutstanding = principal.add(totalInterest).setScale(2, RoundingMode.CEILING);
+
                     return Mono.just(GenericResponse.<DefaultResponseHeader, LoanRepaymentSchedulingResponse>builder()
                             .header(DefaultResponseHeader.builder()
                                     .customerMessage("Loan repayment schedule created successfully")
@@ -113,10 +125,10 @@ public class LoanRepaymentServiceImpl implements LoanRepaymentService {
                                     .responseRefId("")
                                     .responseCode(ResponseCodes.RC_200)
                                     .build())
-                                    .body(LoanRepaymentSchedulingResponse.builder()
-                                            .totalOutstandingAmount(totalOutstanding)
-                                            .interestComponent(totalInterest)
-                                            .build())
+                            .body(LoanRepaymentSchedulingResponse.builder()
+                                    .totalOutstandingAmount(savedLoan.getOutstandingAmount())
+                                    .interestComponent(savedLoan.getOutstandingAmount().subtract(loan.getPrincipalAmount()).setScale(2, RoundingMode.CEILING))
+                                    .build())
                             .build());
                 });
 
@@ -140,7 +152,7 @@ public class LoanRepaymentServiceImpl implements LoanRepaymentService {
                     if (loanQueryResponseDtos.isEmpty()) {
                         return GenericResponse.<DefaultResponseHeader, List<LoanQueryResponseDto>>builder()
                                 .header(DefaultResponseHeader.builder()
-                                        .customerMessage("No " + loanStatus +" loans found")
+                                        .customerMessage("No " + loanStatus + " loans found")
                                         .responseCode(ResponseCodes.RC_404)
                                         .responseRefId("")
                                         .operation(OperationNameEnum.LOAN_QUERY)
@@ -149,13 +161,13 @@ public class LoanRepaymentServiceImpl implements LoanRepaymentService {
                                 .build();
                     }
                     return GenericResponse.<DefaultResponseHeader, List<LoanQueryResponseDto>>builder()
-                                    .header(DefaultResponseHeader.builder()
-                                            .customerMessage("Loan query successful")
-                                            .responseCode(ResponseCodes.RC_200)
-                                            .responseRefId("")
-                                            .operation(OperationNameEnum.LOAN_QUERY)
-                                            .build())
-                                    .body(loanQueryResponseDtos)
+                            .header(DefaultResponseHeader.builder()
+                                    .customerMessage("Loan query successful")
+                                    .responseCode(ResponseCodes.RC_200)
+                                    .responseRefId("")
+                                    .operation(OperationNameEnum.LOAN_QUERY)
+                                    .build())
+                            .body(loanQueryResponseDtos)
                             .build();
                 });
     }
@@ -194,8 +206,6 @@ public class LoanRepaymentServiceImpl implements LoanRepaymentService {
                 });
 
 
-
-
     }
 
     @Override
@@ -209,7 +219,7 @@ public class LoanRepaymentServiceImpl implements LoanRepaymentService {
                                 FundTransfer chosenFundTransfer = getChosenFundTransfer(mode);
 
                                 BigDecimal amount = getAmountToBePaid(repaymentCommand, repaymentSchedule);
-                                return chosenFundTransfer.receive(amount,repaymentCommand.getWalletId())
+                                return chosenFundTransfer.receive(amount, repaymentCommand.getWalletId())
                                         .flatMap(isSuccessful -> {
 
                                             Repayment repayment = Repayment.builder()
@@ -255,7 +265,7 @@ public class LoanRepaymentServiceImpl implements LoanRepaymentService {
             return Mono.just(repaymentSchedule);
         }
         repaymentSchedule.setTotalPaid(repaymentSchedule.getTotalPaid().add(amount));
-        repaymentSchedule.setStatus(repaymentSchedule.getTotalPaid().compareTo(repaymentSchedule.getEmiAmount()) >=0 ? LoanStatusEnum.CLOSED.name() : LoanStatusEnum.OPEN.name());
+        repaymentSchedule.setStatus(repaymentSchedule.getTotalPaid().compareTo(repaymentSchedule.getEmiAmount()) >= 0 ? LoanStatusEnum.CLOSED.name() : LoanStatusEnum.OPEN.name());
         return repaymentScheduleRepository.save(repaymentSchedule);
     }
 
@@ -272,14 +282,6 @@ public class LoanRepaymentServiceImpl implements LoanRepaymentService {
                         return Mono.just(true);
                     }
                 });
-    }
-
-    private static BigDecimal getAmountToBePaid(RepaymentCommand repaymentCommand, RepaymentSchedule repaymentSchedule) {
-        BigDecimal amount = repaymentCommand.getAmount();
-        if (amount.compareTo(repaymentSchedule.getEmiAmount()) > 0) {
-            amount = repaymentSchedule.getEmiAmount(); // do not overpay
-        }
-        return amount;
     }
 
     private Flux<Loan> getAllByCustomerIdAndStatus(UUID userId, LoanStatusEnum loanStatus) {

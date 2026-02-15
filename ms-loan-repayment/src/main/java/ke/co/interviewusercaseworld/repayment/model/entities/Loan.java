@@ -36,7 +36,7 @@ public class Loan {
     private BigDecimal interestRate;
 
     @Column("tenure_months")
-    private Integer tenureMonths;
+    private Integer tenure;
 
     @Column("outstanding_amount")
     private BigDecimal outstandingAmount;

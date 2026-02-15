@@ -50,7 +50,7 @@ class FlatRateScheduleCalculatorTest {
                 .tenure(3)
                 .interestRateType(InterestRateTypeEnum.FlatRate)
                 .disbursementDate(LocalDateTime.now())
-                .repaymentOption(true)
+                .repaymentOption(RepaymentOptionEnum.INSTALLMENT)
                 .loanId(UUID.randomUUID())
                 .productId(UUID.randomUUID())
                 .customerId(UUID.randomUUID())
@@ -106,7 +106,7 @@ class FlatRateScheduleCalculatorTest {
 
     @Test
     void testFlatRateScheduleCalculator_notInstallment() {
-        monthlyInstallmentSchedulingDto.setRepaymentOption(false); //
+        monthlyInstallmentSchedulingDto.setRepaymentOption(RepaymentOptionEnum.BULLET); //
         StepVerifier.create(calculator.apply(monthlyInstallmentSchedulingDto))
                 .expectNextCount(1)
                 .assertNext(repaymentScheduleResponseDto -> {

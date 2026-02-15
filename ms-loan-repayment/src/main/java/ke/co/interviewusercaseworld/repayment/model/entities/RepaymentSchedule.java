@@ -5,6 +5,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.Id;
+import org.springframework.data.relational.core.mapping.Column;
 import org.springframework.data.relational.core.mapping.Table;
 
 import java.math.BigDecimal;
@@ -26,4 +27,6 @@ public class RepaymentSchedule {
     private BigDecimal interestComponent;
     private BigDecimal totalPaid;
     private String status;
+    @Column("schedule_number")
+    private Integer installmentNumber;
 }

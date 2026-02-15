@@ -16,8 +16,6 @@ import reactor.core.publisher.Mono;
 import java.math.BigDecimal;
 import java.math.MathContext;
 import java.math.RoundingMode;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static ke.co.interviewusercaseworld.commons.utils.Helpers.*;
@@ -40,8 +38,6 @@ public class FlatRateScheduleCalculator implements ScheduleCalculator {
     public Flux<RepaymentScheduleResponseDto> apply(LoanRepaymentSchedulingDto request) {
         Helpers.log("", LogLevelEnum.info, OperationNameEnum.FLAT_RATE_SCHEDULE_GENERATION, "Generating flat rate schedule...", null);
 
-        List<RepaymentScheduleResponseDto> schedules = new ArrayList<>();
-
         BigDecimal principal = request.getPrincipal();
         int installments = RepaymentOptionEnum.INSTALLMENT.equals(request.getRepaymentOption()) ? calculateInstallments(request.getTenure(), request.getTenureUnit(), request.getInstallmentFrequency()) : 1;
 
@@ -61,14 +57,13 @@ public class FlatRateScheduleCalculator implements ScheduleCalculator {
 
         return Flux.range(1, installments)
                 .flatMap(i -> {
-                    System.out.println("Installment: " + i);
                     remaining.set(remaining.get().subtract(principalPerInstallment));
 
                     RepaymentScheduleResponseDto schedule = RepaymentScheduleResponseDto.builder()
                             .installmentNumber(i)
                             .loanId(request.getLoanId())
                             .interestComponent(interestPerInstallment)
-                            .status("PENDING")
+                            .status(i == 1 ? "OPEN" : "PENDING")
                             .principalComponent(principalPerInstallment)
                             .emiAmount(installmentAmount)
                             .dueDate(calculateDueDate(request.getDisbursementDate(), request.getInstallmentFrequency(), i))

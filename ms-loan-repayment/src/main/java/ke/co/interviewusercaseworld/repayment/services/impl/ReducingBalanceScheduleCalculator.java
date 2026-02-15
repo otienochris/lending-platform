@@ -54,7 +54,7 @@ public class ReducingBalanceScheduleCalculator implements ScheduleCalculator {
                             .installmentNumber(i)
                             .loanId(request.getLoanId())
                             .interestComponent(interest.setScale(2, RoundingMode.CEILING))
-                            .status("PENDING")
+                            .status(i == 1 ? "OPEN" : "PENDING")
                             .principalComponent(principalRepaid.setScale(2, RoundingMode.CEILING))
                             .emiAmount(emi.setScale(2, RoundingMode.CEILING))
                             .dueDate(calculateDueDate(request.getDisbursementDate(), request.getInstallmentFrequency(), i))
