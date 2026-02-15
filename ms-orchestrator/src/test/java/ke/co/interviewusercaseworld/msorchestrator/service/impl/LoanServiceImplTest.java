@@ -5,6 +5,7 @@ import ke.co.interviewusercaseworld.commons.dto.requests.DefaultRequestHeader;
 import ke.co.interviewusercaseworld.commons.dto.requests.GenericRequest;
 import ke.co.interviewusercaseworld.commons.dto.responses.DefaultResponseHeader;
 import ke.co.interviewusercaseworld.commons.dto.responses.GenericResponse;
+import ke.co.interviewusercaseworld.commons.enums.RepaymentOptionEnum;
 import ke.co.interviewusercaseworld.commons.enums.ResponseCodes;
 import ke.co.interviewusercaseworld.commons.enums.WalletTypeEnum;
 import ke.co.interviewusercaseworld.msorchestrator.model.dto.request.LoanApplicationRequest;
@@ -195,7 +196,7 @@ class LoanServiceImplTest {
                     .body(LoanApplicationRequest.builder()
                             .productId(UUID.randomUUID())
                             .loanAmount(BigDecimal.valueOf(1000))
-                            .repaymentOption(true)
+                            .repaymentOption(RepaymentOptionEnum.INSTALLMENT)
                             .build())
                     .build();
         }
