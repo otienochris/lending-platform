@@ -1,7 +1,7 @@
 package ke.co.interviewusercaseworld.msorchestrator.model.dto.request.commands;
 
 import ke.co.interviewusercaseworld.commons.enums.InterestRateTypeEnum;
-import ke.co.interviewusercaseworld.commons.enums.TenureOptionsTypeEnum;
+import ke.co.interviewusercaseworld.commons.enums.TenureUnitEnum;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -19,6 +19,6 @@ public class RepaymentCommand {
     private String interestRate;
     private InterestRateTypeEnum interestRateType;
     private Integer tenure;
-    private TenureOptionsTypeEnum tenureType;
+    private TenureUnitEnum tenureType;
 
 }

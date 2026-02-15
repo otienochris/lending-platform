@@ -1,6 +1,5 @@
 package ke.co.interviewusercaseworld.commons.entities.product;
 
-import ke.co.interviewusercaseworld.commons.enums.InterestRateTypeEnum;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -32,6 +31,6 @@ public class LoanProduct {
     private LocalDateTime effectiveTo;
     private String currency;
     private Boolean supportInstallments;
-
     private Boolean active;
+    private String interestType;
 }

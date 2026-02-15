@@ -1,9 +1,7 @@
 package ke.co.interviewusercaseworld.commons.dto.commands;
 
-import ke.co.interviewusercaseworld.commons.enums.InterestRateTypeEnum;
 import ke.co.interviewusercaseworld.commons.enums.NotificationTemplateEnum;
 import ke.co.interviewusercaseworld.commons.enums.NotificationTypeEnum;
-import ke.co.interviewusercaseworld.commons.enums.TenureOptionsTypeEnum;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;

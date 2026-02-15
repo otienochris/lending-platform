@@ -181,11 +181,11 @@ public class EventListeners {
                         .productId(productId)
                         .principal(amount)
                         .customerId(repaymentCommand.getCustomerId())
-                        .interestRate(repaymentCommand.getInterestRate())
+                        .annualInterestRate(repaymentCommand.getInterestRate())
                         .tenure(repaymentCommand.getTenure())
                         .interestRateType(repaymentCommand.getInterestRateType())
-                        .tenureType(repaymentCommand.getTenureType())
-                        .isInstallment(repaymentCommand.getIsInstallment())
+                        .tenureUnit(repaymentCommand.getTenureType())
+                        .repaymentOption(repaymentCommand.getRepaymentOption())
                         .build())
                 .build();
         return loanRepaymentService.schedule(disbursementRequest)
@@ -197,7 +197,7 @@ public class EventListeners {
                             .status(res.getHeader().getResponseCode().name())
                             .dueDate(now().plusMonths(1))
                             .totalLoanAmount(res.getBody() == null? BigDecimal.ZERO: res.getBody().getTotalOutstandingAmount())// todo
-                            .totalInterest(res.getBody() == null? BigDecimal.ZERO: res.getBody().getTotalInterest())
+                            .totalInterest(res.getBody() == null ? BigDecimal.ZERO : res.getBody().getInterestComponent())
                             .build();
 
                     try {
@@ -211,10 +211,10 @@ public class EventListeners {
                                 .payload(payloadString)
                                 .build();
                         return outBoxEventRepository.save(outboxEvent)
-                                .doOnError(throwable -> Helpers.log("loan.disbursement.event", LogLevelEnum.ERROR, OperationNameEnum.KAFKA_CONSUMER, "Error occured saving outbox event", new RuntimeException(throwable)))
+                                .doOnError(throwable -> Helpers.log("loan.repayment.scheduling.event", LogLevelEnum.ERROR, OperationNameEnum.KAFKA_CONSUMER, "Error occurred saving outbox event", new RuntimeException(throwable)))
                                 .doOnSuccess(res1 -> Helpers.log("", LogLevelEnum.INFO, OperationNameEnum.KAFKA_CONSUMER, "Saved loan.repayment.event", null));
                     } catch (Exception e) {
-                        Helpers.log("", LogLevelEnum.ERROR, OperationNameEnum.KAFKA_CONSUMER, "Error saving product.validation.event", e);
+                        Helpers.log("", LogLevelEnum.ERROR, OperationNameEnum.KAFKA_CONSUMER, "Error saving loan.repayment.scheduling.event", e);
                         return Mono.empty();
                     }
                 }).then();

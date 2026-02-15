@@ -1,7 +1,7 @@
 package ke.co.interviewusercaseworld.productconfig.model.dto.request;
 
 import ke.co.interviewusercaseworld.commons.enums.InterestRateTypeEnum;
-import ke.co.interviewusercaseworld.commons.enums.TenureOptionsTypeEnum;
+import ke.co.interviewusercaseworld.commons.enums.TenureUnitEnum;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -22,7 +22,7 @@ public class LoanProductCreationRequest {
     private BigDecimal interestRate;
     private InterestRateTypeEnum interestRateType;
     private List<Integer> tenureOptions;
-    private TenureOptionsTypeEnum tenureOptionsType;
+    private TenureUnitEnum tenureOptionsType;
     private LocalDateTime effectiveFrom;
     private LocalDateTime effectiveTo;
 }

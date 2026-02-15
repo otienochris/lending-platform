@@ -1,5 +1,6 @@
 package ke.co.interviewusercaseworld.msorchestrator.model.dto.request;
 
+import ke.co.interviewusercaseworld.commons.enums.RepaymentOptionEnum;
 import ke.co.interviewusercaseworld.commons.enums.WalletTypeEnum;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -25,5 +26,5 @@ public class LoanApplicationRequest {
     private WalletTypeEnum walletType = WalletTypeEnum.MobileMoney;
     private String walletId;
     @Builder.Default
-    private Boolean installment = false;
+    private RepaymentOptionEnum repaymentOption = RepaymentOptionEnum.BULLET;
 }

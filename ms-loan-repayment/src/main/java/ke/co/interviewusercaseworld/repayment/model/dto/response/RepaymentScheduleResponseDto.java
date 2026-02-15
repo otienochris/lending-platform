@@ -6,7 +6,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
-import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Data
@@ -14,11 +14,13 @@ import java.util.UUID;
 @AllArgsConstructor
 @NoArgsConstructor
 public class RepaymentScheduleResponseDto {
+    private Integer installmentNumber;
     private UUID scheduleId;
     private UUID loanId;
-    private LocalDate dueDate;
+    private LocalDateTime dueDate;
     private BigDecimal emiAmount;
     private BigDecimal principalComponent;
     private BigDecimal interestComponent;
+    private BigDecimal remainingBalance;
     private String status;
 }

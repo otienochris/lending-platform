@@ -4,11 +4,11 @@ import ke.co.interviewusercaseworld.commons.dto.requests.DefaultRequestHeader;
 import ke.co.interviewusercaseworld.commons.dto.requests.GenericRequest;
 import ke.co.interviewusercaseworld.commons.dto.responses.DefaultResponseHeader;
 import ke.co.interviewusercaseworld.commons.dto.responses.GenericResponse;
+import ke.co.interviewusercaseworld.commons.dto.responses.LoanProductResponseDto;
+import ke.co.interviewusercaseworld.commons.dto.responses.ProductFeeResponseDto;
 import ke.co.interviewusercaseworld.commons.enums.ResponseCodes;
 import ke.co.interviewusercaseworld.productconfig.model.dto.request.FeeRequestDto;
 import ke.co.interviewusercaseworld.productconfig.model.dto.request.LoanProductCreationRequest;
-import ke.co.interviewusercaseworld.productconfig.model.dto.response.FeeResponseDto;
-import ke.co.interviewusercaseworld.productconfig.model.dto.response.LoanProductCreationResponseDto;
 import ke.co.interviewusercaseworld.productconfig.service.FeeService;
 import ke.co.interviewusercaseworld.productconfig.service.LoanProductService;
 import lombok.RequiredArgsConstructor;
@@ -30,7 +30,7 @@ public class LoanProductController {
     private final FeeService feeService;
 
     @PostMapping
-    public Mono<ResponseEntity<GenericResponse<DefaultResponseHeader, LoanProductCreationResponseDto>>> create(
+    public Mono<ResponseEntity<GenericResponse<DefaultResponseHeader, LoanProductResponseDto>>> create(
             @RequestBody GenericRequest<DefaultRequestHeader, LoanProductCreationRequest> request
     ) {
 
@@ -45,12 +45,12 @@ public class LoanProductController {
     }
 
     @GetMapping
-    public Flux<LoanProductCreationResponseDto> getAll(@RequestHeader Map<String, String> headers) {
+    public Flux<LoanProductResponseDto> getAll(@RequestHeader Map<String, String> headers) {
         return productService.getAllLoanProducts(headers);
     }
 
     @GetMapping("/{productId}")
-    public Mono<ResponseEntity<GenericResponse<DefaultResponseHeader, LoanProductCreationResponseDto>>> getById(
+    public Mono<ResponseEntity<GenericResponse<DefaultResponseHeader, LoanProductResponseDto>>> getById(
             @PathVariable UUID productId,
             @RequestHeader Map<String, String> headers
     ) {
@@ -65,7 +65,7 @@ public class LoanProductController {
     }
 
     @PutMapping("/{productId}")
-    public Mono<ResponseEntity<GenericResponse<DefaultResponseHeader, LoanProductCreationResponseDto>>> update(
+    public Mono<ResponseEntity<GenericResponse<DefaultResponseHeader, LoanProductResponseDto>>> update(
             @PathVariable UUID productId,
             @RequestBody GenericRequest<DefaultRequestHeader, LoanProductCreationRequest> request
     ) {
@@ -92,7 +92,7 @@ public class LoanProductController {
     }
 
     @PostMapping("/{productId}/fees")
-    public Mono<ResponseEntity<GenericResponse<DefaultResponseHeader, List<FeeResponseDto>>>> addFee(
+    public Mono<ResponseEntity<GenericResponse<DefaultResponseHeader, List<ProductFeeResponseDto>>>> addFee(
             @PathVariable UUID productId,
             @RequestBody GenericRequest<DefaultRequestHeader, List<FeeRequestDto>> request
     ) {
@@ -105,7 +105,7 @@ public class LoanProductController {
                     }
                 })
                 .onErrorResume(throwable -> {
-                    return Mono.just(ResponseEntity.badRequest().body(GenericResponse.<DefaultResponseHeader, List<FeeResponseDto>>builder()
+                    return Mono.just(ResponseEntity.badRequest().body(GenericResponse.<DefaultResponseHeader, List<ProductFeeResponseDto>>builder()
                                     .header(DefaultResponseHeader.builder()
                                             .responseCode(ResponseCodes.RC_400)
                                             .responseRefId(request.getHeader().getRequestRefId())
@@ -119,7 +119,7 @@ public class LoanProductController {
     }
 
     @GetMapping("/{productId}/fees")
-    public Mono<ResponseEntity<GenericResponse<DefaultResponseHeader, List<FeeResponseDto>>>> getFees(@RequestHeader Map<String, String> headers, @PathVariable UUID productId) {
+    public Mono<ResponseEntity<GenericResponse<DefaultResponseHeader, List<ProductFeeResponseDto>>>> getFees(@RequestHeader Map<String, String> headers, @PathVariable UUID productId) {
         return feeService.getFees(productId, headers)
                 .flatMap(response -> {
                     if (ResponseCodes.RC_200.equals(response.getHeader().getResponseCode())){

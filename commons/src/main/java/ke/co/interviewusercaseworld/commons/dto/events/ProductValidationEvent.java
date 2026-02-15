@@ -1,5 +1,6 @@
 package ke.co.interviewusercaseworld.commons.dto.events;
 
+import ke.co.interviewusercaseworld.commons.dto.responses.LoanProductResponseDto;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -17,4 +18,5 @@ public class ProductValidationEvent {
     private UUID loanId;
     private String status;
     private String message;
+    private LoanProductResponseDto productDetails; // todo: create a minimized object for this event
 }

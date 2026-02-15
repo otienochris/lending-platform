@@ -4,20 +4,23 @@ import ke.co.interviewusercaseworld.commons.dto.requests.DefaultRequestHeader;
 import ke.co.interviewusercaseworld.commons.dto.requests.GenericRequest;
 import ke.co.interviewusercaseworld.commons.dto.responses.DefaultResponseHeader;
 import ke.co.interviewusercaseworld.commons.dto.responses.GenericResponse;
+import ke.co.interviewusercaseworld.commons.dto.responses.LoanProductResponseDto;
 import ke.co.interviewusercaseworld.commons.entities.product.LoanProduct;
 import ke.co.interviewusercaseworld.commons.enums.LogLevelEnum;
 import ke.co.interviewusercaseworld.commons.enums.OperationNameEnum;
 import ke.co.interviewusercaseworld.commons.utils.Helpers;
 import ke.co.interviewusercaseworld.productconfig.mappers.LoanProductMapper;
+import ke.co.interviewusercaseworld.productconfig.mappers.ProductFeeMapper;
 import ke.co.interviewusercaseworld.productconfig.model.dto.request.LoanProductCreationRequest;
-import ke.co.interviewusercaseworld.productconfig.model.dto.response.LoanProductCreationResponseDto;
 import ke.co.interviewusercaseworld.productconfig.repository.LoanProductRepository;
+import ke.co.interviewusercaseworld.productconfig.repository.ProductFeeRepository;
 import ke.co.interviewusercaseworld.productconfig.service.LoanProductService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -30,9 +33,11 @@ public class LoanProductServiceImpl implements LoanProductService {
 
     private final LoanProductMapper loanProductMapper;
     private final LoanProductRepository loanProductRepository;
+    private final ProductFeeRepository productFeeRepository;
+    private final ProductFeeMapper productFeeMapper;
 
     @Override
-    public Mono<GenericResponse<DefaultResponseHeader, LoanProductCreationResponseDto>> createLoanProduct(GenericRequest<DefaultRequestHeader, LoanProductCreationRequest> request) {
+    public Mono<GenericResponse<DefaultResponseHeader, LoanProductResponseDto>> createLoanProduct(GenericRequest<DefaultRequestHeader, LoanProductCreationRequest> request) {
         String requestRefId = request.getHeader().getRequestRefId();
         Helpers.log(requestRefId, LogLevelEnum.info, OperationNameEnum.PRODUCT_CREATION, "Creating new loan product", null);
         LoanProduct entity = loanProductMapper.toEntity(request.getBody());
@@ -40,7 +45,7 @@ public class LoanProductServiceImpl implements LoanProductService {
                 .defaultIfEmpty(false)
                 .flatMap(exists -> {
                     if (exists) {
-                        return Mono.just(GenericResponse.<DefaultResponseHeader, LoanProductCreationResponseDto>builder()
+                        return Mono.just(GenericResponse.<DefaultResponseHeader, LoanProductResponseDto>builder()
                                         .header(DefaultResponseHeader.builder()
                                                 .responseCode(RC_400)
                                                 .responseRefId(requestRefId)
@@ -62,7 +67,7 @@ public class LoanProductServiceImpl implements LoanProductService {
                             .map(loanProductMapper::toDto)
                             .map(loanProductCreationResponseDto -> {
                                 if (loanProductCreationResponseDto.getId() == null) {
-                                    return GenericResponse.<DefaultResponseHeader, LoanProductCreationResponseDto>builder()
+                                    return GenericResponse.<DefaultResponseHeader, LoanProductResponseDto>builder()
                                             .header(DefaultResponseHeader.builder()
                                                     .responseRefId(requestRefId)
                                                     .responseCode(RC_500)
@@ -84,7 +89,7 @@ public class LoanProductServiceImpl implements LoanProductService {
                                         .customerMessage("Loan product created successfully")
                                         .debugMessage("Loan product created successfully")
                                         .build();
-                                return GenericResponse.<DefaultResponseHeader, LoanProductCreationResponseDto>builder()
+                                return GenericResponse.<DefaultResponseHeader, LoanProductResponseDto>builder()
                                         .header(header)
                                         .body(loanProductCreationResponseDto)
                                         .build();
@@ -94,8 +99,8 @@ public class LoanProductServiceImpl implements LoanProductService {
     }
 
     @Override
-    public Mono<GenericResponse<DefaultResponseHeader, LoanProductCreationResponseDto>> updateLoanProduct(UUID loanProductId, GenericRequest<DefaultRequestHeader, LoanProductCreationRequest> loanProductCreationRequest) {
-        return Mono.just(GenericResponse.<DefaultResponseHeader, LoanProductCreationResponseDto>builder().build()); //todo
+    public Mono<GenericResponse<DefaultResponseHeader, LoanProductResponseDto>> updateLoanProduct(UUID loanProductId, GenericRequest<DefaultRequestHeader, LoanProductCreationRequest> loanProductCreationRequest) {
+        return Mono.just(GenericResponse.<DefaultResponseHeader, LoanProductResponseDto>builder().build()); //todo
     }
 
     @Override
@@ -140,7 +145,7 @@ public class LoanProductServiceImpl implements LoanProductService {
     }
 
     @Override
-    public Mono<GenericResponse<DefaultResponseHeader, LoanProductCreationResponseDto>> getLoanProduct(UUID loanProductId, Map<String, String> headers) {
+    public Mono<GenericResponse<DefaultResponseHeader, LoanProductResponseDto>> getLoanProduct(UUID loanProductId, Map<String, String> headers) {
         DefaultRequestHeader headerObject = getDefaultRequestHeaderObject(headers);
         Helpers.log(headerObject.getRequestRefId(), LogLevelEnum.info, headerObject.getOperation(), "Getting loan product", null);
         return loanProductRepository.findById(loanProductId)
@@ -152,38 +157,55 @@ public class LoanProductServiceImpl implements LoanProductService {
                 .flatMap(loanProduct -> {
                     if (loanProduct.getId() == null) {
                         Helpers.log(headerObject.getRequestRefId(), LogLevelEnum.warn, headerObject.getOperation(), "Loan product not found", null);
-                        return Mono.just(GenericResponse.<DefaultResponseHeader, LoanProductCreationResponseDto>builder()
+                        return Mono.just(GenericResponse.<DefaultResponseHeader, LoanProductResponseDto>builder()
                                 .header(DefaultResponseHeader.builder()
                                         .responseCode(RC_400)
                                         .responseRefId(headerObject.getRequestRefId())
                                         .correlationId(headerObject.getCorrelationId())
                                         .sourceSystem(headerObject.getSourceSystem())
                                         .customerMessage("Loan product not found")
-                                        .debugMessage("Loan product could not be deleted")
+                                        .debugMessage("Loan product could not be found")
                                         .build())
                                 .build());
                     }
-                    Helpers.log(headerObject.getRequestRefId(), LogLevelEnum.info, headerObject.getOperation(), "Loan product found successfully", null);
-                    LoanProductCreationResponseDto dto = loanProductMapper.toDto(loanProduct);
-                    return Mono.just(GenericResponse.<DefaultResponseHeader, LoanProductCreationResponseDto>builder()
-                                    .header(DefaultResponseHeader.builder()
-                                            .responseCode(RC_200)
-                                            .responseRefId(headerObject.getRequestRefId())
-                                            .correlationId(headerObject.getCorrelationId())
-                                            .sourceSystem(headerObject.getSourceSystem())
-                                            .operation(headerObject.getOperation())
-                                            .build())
-                                    .body(dto)
-                            .build());
+                    Helpers.log(headerObject.getRequestRefId(), LogLevelEnum.info, headerObject.getOperation(), "Loan product found successfully. Fetching its fess...", null);
+                    LoanProductResponseDto dto = loanProductMapper.toDto(loanProduct);
+                    return productFeeRepository.findByProductId(loanProductId)
+                            .map(productFeeMapper::toDto)
+                            .collectList()
+                            .defaultIfEmpty(List.of())
+                            .flatMap(fees -> {
+                                dto.setFees(fees);
+                                return Mono.just(GenericResponse.<DefaultResponseHeader, LoanProductResponseDto>builder()
+                                        .header(DefaultResponseHeader.builder()
+                                                .responseCode(RC_200)
+                                                .responseRefId(headerObject.getRequestRefId())
+                                                .correlationId(headerObject.getCorrelationId())
+                                                .sourceSystem(headerObject.getSourceSystem())
+                                                .operation(headerObject.getOperation())
+                                                .build())
+                                        .body(dto)
+                                        .build());
+                            });
                 });
     }
 
     @Override
-    public Flux<LoanProductCreationResponseDto> getAllLoanProducts(Map<String, String> headers) {
+    public Flux<LoanProductResponseDto> getAllLoanProducts(Map<String, String> headers) {
         DefaultRequestHeader defaultRequestHeaderObject = getDefaultRequestHeaderObject(headers);
         Helpers.log(defaultRequestHeaderObject.getRequestRefId(), LogLevelEnum.info, defaultRequestHeaderObject.getOperation(), "Creating new loan product", null);
         return loanProductRepository.findAll()
-                .map(loanProductMapper::toDto);
+                .map(loanProductMapper::toDto)
+                .flatMap(loanProductResponseDto -> {
+                    return productFeeRepository.findByProductId(loanProductResponseDto.getId())
+                            .map(productFeeMapper::toDto)
+                            .collectList()
+                            .defaultIfEmpty(List.of())
+                            .map(fees -> {
+                                loanProductResponseDto.setFees(fees);
+                                return loanProductResponseDto;
+                            });
+                });
     }
 
 

@@ -1,4 +1,4 @@
-package ke.co.interviewusercaseworld.productconfig.model.dto.response;
+package ke.co.interviewusercaseworld.commons.dto.responses;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -11,7 +11,7 @@ import java.math.BigDecimal;
 @Builder
 @AllArgsConstructor
 @NoArgsConstructor
-public class FeeResponseDto {
+public class ProductFeeResponseDto {
     private String feeId;
     private String feeType;
     private BigDecimal feeValue;

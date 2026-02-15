@@ -195,7 +195,7 @@ class LoanServiceImplTest {
                     .body(LoanApplicationRequest.builder()
                             .productId(UUID.randomUUID())
                             .loanAmount(BigDecimal.valueOf(1000))
-                            .installment(true)
+                            .repaymentOption(true)
                             .build())
                     .build();
         }

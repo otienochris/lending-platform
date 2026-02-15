@@ -19,6 +19,7 @@ import ke.co.interviewusercaseworld.repayment.repository.LoanRepository;
 import ke.co.interviewusercaseworld.repayment.repository.RepaymentScheduleRepository;
 import ke.co.interviewusercaseworld.repayment.repository.RepaymentsRepository;
 import ke.co.interviewusercaseworld.repayment.services.FundTransfer;
+import ke.co.interviewusercaseworld.repayment.services.LoanRepaymentScheduleService;
 import ke.co.interviewusercaseworld.repayment.services.LoanRepaymentService;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NonNull;
@@ -29,13 +30,13 @@ import reactor.core.publisher.Mono;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.atomic.AtomicReference;
+
+import static ke.co.interviewusercaseworld.commons.utils.Helpers.convertFirstCharToLowerCase;
 
 @Service
 @RequiredArgsConstructor
@@ -49,85 +50,18 @@ public class LoanRepaymentServiceImpl implements LoanRepaymentService {
     private final LoanMapper loanMapper;
     private final Map<String, FundTransfer> fundTransferServices;
     private final RepaymentsRepository repaymentsRepository;
+    private final LoanRepaymentScheduleService loanRepaymentScheduleService;
 
     public Flux<RepaymentSchedule> createSchedule(
-            LoanRepaymentSchedulingDto dto,
-            LocalDate firstDueDate
+            LoanRepaymentSchedulingDto dto
     ) {
-
-        if (!dto.getIsInstallment()) {
-            BigDecimal interest = switch (dto.getTenureType()) {
-                case DAYS -> dto.getPrincipal().multiply(dto.getInterestRate()).divide(BigDecimal.valueOf(365), 2, RoundingMode.HALF_UP);
-                case MONTHS -> dto.getPrincipal().multiply(dto.getInterestRate()).divide(BigDecimal.valueOf(12), 2, RoundingMode.HALF_UP);
-                case YEARS -> dto.getPrincipal().multiply(dto.getInterestRate()).divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
-                default -> BigDecimal.ONE;
-            };
-
-            LocalDateTime now = LocalDateTime.now();
-            LocalDateTime dueDate = switch (dto.getTenureType()) {
-                case DAYS -> now.plusDays(dto.getTenure());
-                case MONTHS -> now.plusMonths(dto.getTenure());
-                case YEARS -> now.plusYears(dto.getTenure());
-                default -> now;
-            };
-
-            BigDecimal total = dto.getPrincipal().add(interest);
-            return Flux.just(RepaymentSchedule.builder()
-                    .loanId(dto.getLoanId())
-                    .dueDate(dueDate.toLocalDate())
-                    .emiAmount(total)
-                    .principalComponent(dto.getPrincipal())
-                    .interestComponent(interest)
-                    .status(LoanStatusEnum.OPEN.name())
-                    .build());
-        }
-
-        int months = resolveTenureInMonths(dto);
-        final BigDecimal[] emi = {Helpers.calculateEmi(
-                dto.getPrincipal(),
-                dto.getInterestRate(),
-                months
-        )};
-
-        BigDecimal monthlyRate = dto.getInterestRate()
-                .divide(BigDecimal.valueOf(12), 10, RoundingMode.HALF_UP)
-                .divide(BigDecimal.valueOf(100), 10, RoundingMode.HALF_UP);
-
-        AtomicReference<BigDecimal> outstanding =
-                new AtomicReference<>(dto.getPrincipal());
-
-        return Flux.range(1, months)
-                .map(i -> {
-                    BigDecimal interest =
-                            outstanding.get().multiply(monthlyRate)
-                                    .setScale(2, RoundingMode.HALF_UP);
-
-                    BigDecimal principalComponent =
-                            emi[0].subtract(interest)
-                                    .setScale(2, RoundingMode.HALF_UP);
-
-                    // Last installment adjustment
-                    if (i == months) {
-                        principalComponent = outstanding.get();
-                        emi[0] = principalComponent.add(interest);
-                    }
-
-                    outstanding.set(outstanding.get().subtract(principalComponent));
-
-                    return RepaymentSchedule.builder()
-                            .loanId(dto.getLoanId())
-                            .dueDate(firstDueDate.plusMonths(i - 1))
-                            .emiAmount(emi[0])
-                            .principalComponent(principalComponent)
-                            .interestComponent(interest)
-                            .status("PENDING")
-                            .build();
-                })
+        return loanRepaymentScheduleService.generateSchedule(dto)
+                .map(repaymentScheduleMapper::toEntity)
                 .flatMap(repaymentScheduleRepository::save);
     }
 
     private int resolveTenureInMonths(LoanRepaymentSchedulingDto dto) {
-        if (dto.getTenureType() == TenureOptionsTypeEnum.YEARS) {
+        if (dto.getTenureUnit() == TenureUnitEnum.YEARS) {
             return dto.getTenure() * 12;
         }
         return dto.getTenure();
@@ -137,24 +71,21 @@ public class LoanRepaymentServiceImpl implements LoanRepaymentService {
     @Override
     public Mono<GenericResponse<DefaultResponseHeader, LoanRepaymentSchedulingResponse>> schedule(GenericRequest<DefaultResponseHeader, LoanRepaymentSchedulingDto> request) {
 
-        LocalDate firstDueDate = switch (request.getBody().getTenureType()) {
-            case DAYS -> LocalDate.now().plusDays(1);
-            case MONTHS, YEARS -> LocalDate.now().plusMonths(1);
-        };
         Helpers.log("", LogLevelEnum.info, OperationNameEnum.REPAYMENT_SCHEDULING, "Creating loan repayment schedule", null);
+        BigDecimal principal = request.getBody().getPrincipal();
         Loan loan = Loan.builder()
-                .interestRate(request.getBody().getInterestRate())
+                .interestRate(request.getBody().getAnnualInterestRate())
                 .loanId(request.getBody().getLoanId())
                 .customerId(request.getBody().getCustomerId())
-                .principalAmount(request.getBody().getPrincipal())
+                .principalAmount(principal)
                 .tenureMonths(resolveTenureInMonths(request.getBody()))
                 .status(LoanStatusEnum.OPEN.name())
                 .createdAt(LocalDateTime.now())
-                .outstandingAmount(request.getBody().getPrincipal()) // todo
+                .outstandingAmount(principal) // todo
                 .build();
         return operator.transactional(
                 loanRepository.save(loan)
-                        .flatMapMany(savedLoan -> createSchedule(request.getBody(), firstDueDate)
+                        .flatMapMany(savedLoan -> createSchedule(request.getBody())
                         .flatMap(repaymentSchedule -> {
                             repaymentSchedule.setLoanId(savedLoan.getId());
                             repaymentSchedule.setTotalPaid(BigDecimal.ZERO);
@@ -163,8 +94,18 @@ public class LoanRepaymentServiceImpl implements LoanRepaymentService {
                         .doOnError(throwable -> Helpers.log("", LogLevelEnum.error, OperationNameEnum.REPAYMENT_SCHEDULING, "", new RuntimeException(throwable))))
                 ).collectList()
                 .flatMap(repaymentSchedule -> {
-                    BigDecimal totalOutstanding = repaymentSchedule.stream().map(RepaymentSchedule::getEmiAmount).reduce(BigDecimal.ZERO, BigDecimal::add);
+                    if (repaymentSchedule.isEmpty()) {
+                        return Mono.just(GenericResponse.<DefaultResponseHeader, LoanRepaymentSchedulingResponse>builder()
+                                .header(DefaultResponseHeader.builder()
+                                        .customerMessage("No repayment schedule created")
+                                        .responseCode(ResponseCodes.RC_400)
+                                        .responseRefId("")
+                                        .operation(request.getHeader().getOperation())
+                                        .build())
+                                .build());
+                    }
                     BigDecimal totalInterest = repaymentSchedule.stream().map(RepaymentSchedule::getInterestComponent).reduce(BigDecimal.ZERO, BigDecimal::add);
+                    BigDecimal totalOutstanding = principal.add(totalInterest).setScale(2, RoundingMode.CEILING);
                     return Mono.just(GenericResponse.<DefaultResponseHeader, LoanRepaymentSchedulingResponse>builder()
                             .header(DefaultResponseHeader.builder()
                                     .customerMessage("Loan repayment schedule created successfully")
@@ -174,7 +115,7 @@ public class LoanRepaymentServiceImpl implements LoanRepaymentService {
                                     .build())
                                     .body(LoanRepaymentSchedulingResponse.builder()
                                             .totalOutstandingAmount(totalOutstanding)
-                                            .totalInterest(totalInterest)
+                                            .interestComponent(totalInterest)
                                             .build())
                             .build());
                 });
@@ -351,11 +292,7 @@ public class LoanRepaymentServiceImpl implements LoanRepaymentService {
     private FundTransfer getChosenFundTransfer(String name) {
         System.out.println("Available Fund transfer services:");
         fundTransferServices.keySet().forEach(System.out::println);
-
-        String key = name + "FundTransferService";
-        StringBuilder sb = new StringBuilder(key);
-        sb.setCharAt(0, Character.toLowerCase(sb.charAt(0)));
-        System.out.println("Chosen fund transfer service: " + sb);
-        return fundTransferServices.get(sb.toString());
+        String key = convertFirstCharToLowerCase(name + "FundTransferService");
+        return fundTransferServices.get(key);
     }
 }

@@ -3,12 +3,12 @@ package ke.co.interviewusercaseworld.productconfig.consumers;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import ke.co.interviewusercaseworld.commons.dto.commands.ProductValidationCommand;
 import ke.co.interviewusercaseworld.commons.dto.events.ProductValidationEvent;
+import ke.co.interviewusercaseworld.commons.dto.responses.LoanProductResponseDto;
 import ke.co.interviewusercaseworld.commons.enums.CommandsEnum;
 import ke.co.interviewusercaseworld.commons.enums.LogLevelEnum;
 import ke.co.interviewusercaseworld.commons.enums.OperationNameEnum;
 import ke.co.interviewusercaseworld.commons.enums.ResponseCodes;
 import ke.co.interviewusercaseworld.commons.utils.Helpers;
-import ke.co.interviewusercaseworld.productconfig.model.dto.response.LoanProductCreationResponseDto;
 import ke.co.interviewusercaseworld.productconfig.model.entity.OutboxEvent;
 import ke.co.interviewusercaseworld.productconfig.repository.OutBoxEventRepository;
 import ke.co.interviewusercaseworld.productconfig.service.LoanProductService;
@@ -52,7 +52,7 @@ public class EventListener {
         return loanProductService.getLoanProduct(productId, Map.of())
                 .flatMap(res -> {
 
-                    ProductValidationEvent command = ProductValidationEvent.builder()
+                    ProductValidationEvent productValidationEvent = ProductValidationEvent.builder()
                             .productId(finalProductValidationCommand.getProductId())
                             .commandId(finalProductValidationCommand.getCommandId())
                             .message(res.getHeader().getCustomerMessage())
@@ -60,7 +60,7 @@ public class EventListener {
                             .build();
 
                     if (res.getHeader().getResponseCode().name().startsWith("RC_2")) {
-                        LoanProductCreationResponseDto body = res.getBody();
+                        LoanProductResponseDto body = res.getBody();
                         Boolean supportInstallments = body.getSupportInstallments();
                         BigDecimal minAmount = body.getMinAmount();
                         BigDecimal maxAmount = body.getMaxAmount();
@@ -69,17 +69,19 @@ public class EventListener {
                         BigDecimal loanAmount = finalProductValidationCommand.getLoanAmount();
 
                         if (installment && !supportInstallments) {
-                            command.setStatus(ResponseCodes.RC_400.name());
-                            command.setMessage("Installment is not supported for this loan amount");
+                            productValidationEvent.setStatus(ResponseCodes.RC_400.name());
+                            productValidationEvent.setMessage("Installment is not supported for this loan amount");
                         } else if (loanAmount.compareTo(minAmount) < 0 || loanAmount.compareTo(maxAmount) > 0) {
-                            command.setStatus(ResponseCodes.RC_400.name());
-                            command.setMessage("Loan amount must be between " + minAmount + " and " + maxAmount);
+                            productValidationEvent.setStatus(ResponseCodes.RC_400.name());
+                            productValidationEvent.setMessage("Loan amount must be between " + minAmount + " and " + maxAmount);
                         }
+
+                        productValidationEvent.setProductDetails(res.getBody());
 
                     }
 
                     try {
-                        String payloadString = objectMapper.writeValueAsString(command);
+                        String payloadString = objectMapper.writeValueAsString(productValidationEvent);
                         OutboxEvent outboxEvent = OutboxEvent.builder()
                                 .eventType(CommandsEnum.PRODUCT_VALIDATION_EVENT.name())
                                 .aggregateType("LOAN")
@@ -89,7 +91,7 @@ public class EventListener {
                                 .payload(payloadString)
                                 .build();
                         return outBoxEventRepository.save(outboxEvent)
-                                .doOnError(throwable -> Helpers.log("product.validation.command", LogLevelEnum.ERROR, OperationNameEnum.KAFKA_CONSUMER, "Error occured saving outbox event", new RuntimeException(throwable)))
+                                .doOnError(throwable -> Helpers.log("product.validation.productValidationEvent", LogLevelEnum.ERROR, OperationNameEnum.KAFKA_CONSUMER, "Error occured saving outbox event", new RuntimeException(throwable)))
                                 .doOnSuccess(res1 -> Helpers.log("", LogLevelEnum.INFO, OperationNameEnum.KAFKA_CONSUMER, "Saved product.validation.event", null));
                     } catch (Exception e) {
                         Helpers.log("", LogLevelEnum.ERROR, OperationNameEnum.KAFKA_CONSUMER, "Error saving product.validation.event", e);

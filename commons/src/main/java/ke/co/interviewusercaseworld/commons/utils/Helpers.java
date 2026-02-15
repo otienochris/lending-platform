@@ -2,15 +2,19 @@ package ke.co.interviewusercaseworld.commons.utils;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import ke.co.interviewusercaseworld.commons.dto.requests.DefaultRequestHeader;
+import ke.co.interviewusercaseworld.commons.enums.InstallmenFrequencyEnum;
 import ke.co.interviewusercaseworld.commons.enums.LogLevelEnum;
 import ke.co.interviewusercaseworld.commons.enums.OperationNameEnum;
+import ke.co.interviewusercaseworld.commons.enums.TenureUnitEnum;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jspecify.annotations.NonNull;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
 import java.math.MathContext;
 import java.math.RoundingMode;
+import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
@@ -58,6 +62,65 @@ public class Helpers {
         }
     }
 
+    private static final MathContext MC = new MathContext(15, RoundingMode.CEILING);
+
+    public static @NonNull String convertFirstCharToLowerCase(String key) {
+        StringBuilder sb = new StringBuilder(key);
+        sb.setCharAt(0, Character.toLowerCase(sb.charAt(0)));
+        return sb.toString();
+    }
+
+    // Convert annual rate into per-period rate
+
+    public static LocalDateTime calculateDueDate(LocalDateTime start,
+                                                 InstallmenFrequencyEnum frequency,
+                                                 int installmentNumber) {
+
+        return switch (frequency) {
+            case DAILY -> start.plusDays(installmentNumber);
+            case WEEKLY -> start.plusWeeks(installmentNumber);
+            case MONTHLY -> start.plusMonths(installmentNumber);
+            case YEARLY -> start.plusYears(installmentNumber);
+        };
+    }
+
+    /**
+     * Rate per period=Annual Interest Rate / Number of periods in a year
+     *
+     * @param frequency          - installment frequency
+     * @param annualInterestRate - annual interest rate
+     * @return rate per period
+     */
+    public static BigDecimal ratePerPeriod(InstallmenFrequencyEnum frequency, BigDecimal annualInterestRate) {
+
+        BigDecimal annualRate = annualInterestRate.divide(BigDecimal.valueOf(100), MC);
+
+        int periodsPerYear = switch (frequency) {
+            case DAILY -> 365;
+            case WEEKLY -> 52;
+            case MONTHLY -> 12;
+            case YEARLY -> 1;
+        };
+
+        return annualRate.divide(BigDecimal.valueOf(periodsPerYear), MC);
+    }
+
+    // EMI Formula
+    public static BigDecimal calculateEMI(BigDecimal principal, BigDecimal interestRate, int installment) {
+
+        if (interestRate.compareTo(BigDecimal.ZERO) == 0) {
+            return principal.divide(BigDecimal.valueOf(installment), 2, RoundingMode.CEILING);
+        }
+
+        BigDecimal onePlusRPowerN =
+                BigDecimal.ONE.add(interestRate).pow(installment, MC);
+
+        BigDecimal numerator = principal.multiply(interestRate).multiply(onePlusRPowerN);
+        BigDecimal denominator = onePlusRPowerN.subtract(BigDecimal.ONE);
+
+        return numerator.divide(denominator, 2, RoundingMode.CEILING);
+    }
+
     public static DefaultRequestHeader getDefaultRequestHeaderObject(Map<String, String> headers) {
         String correlationId = headers.getOrDefault("X-Correlation-ID", "");
         UUID uuidCorrelation = null;
@@ -85,9 +148,22 @@ public class Helpers {
                 .build();
     }
 
+    public static int calculateInstallments(Integer tenure, TenureUnitEnum tenureUnit, InstallmenFrequencyEnum installmentFrequency) {
 
-    private static final MathContext MC = new MathContext(15, RoundingMode.HALF_UP);
+        int totalDays = switch (tenureUnit) {
+            case DAYS -> tenure;
+            case WEEKS -> tenure * 7;
+            case MONTHS -> tenure * 30;
+            case YEARS -> tenure * 365;
+        };
 
+        return switch (installmentFrequency) {
+            case DAILY -> totalDays;
+            case WEEKLY -> totalDays / 7;
+            case MONTHLY -> totalDays / 30;
+            case YEARLY -> totalDays / 365;
+        };
+    }
 
     /**
      * EMI formula (reducing balance)
@@ -96,32 +172,29 @@ public class Helpers {
      * r = annualInterestRate / 12 / 100
      * n = number of months
      *
-     * EMI = P * r * (1 + r)^n / ((1 + r)^n - 1)
-     * @param principal
-     * @param annualRate
-     * @param months
+     * EMI = (P * r * (1 + r)^n) / ((1 + r)^n - 1)
+     * @param principal - principal amount
+     * @param ratePerPeriod - rate per period
+     * @param installments - number of installments
      * @return
      */
 
     public static BigDecimal calculateEmi(
             BigDecimal principal,
-            BigDecimal annualRate,
-            int months
+            BigDecimal ratePerPeriod,
+            int installments
     ) {
-        BigDecimal monthlyRate = annualRate
-                .divide(BigDecimal.valueOf(12), MC)
-                .divide(BigDecimal.valueOf(100), MC);
 
         BigDecimal onePlusRPowerN =
-                monthlyRate.add(BigDecimal.ONE).pow(months, MC);
+                ratePerPeriod.add(BigDecimal.ONE).pow(installments, MC);
 
         BigDecimal numerator =
-                principal.multiply(monthlyRate).multiply(onePlusRPowerN);
+                principal.multiply(ratePerPeriod).multiply(onePlusRPowerN);
 
         BigDecimal denominator =
                 onePlusRPowerN.subtract(BigDecimal.ONE);
 
         return numerator
-                .divide(denominator, 2, RoundingMode.HALF_UP);
+                .divide(denominator, 2, RoundingMode.CEILING);
     }
 }

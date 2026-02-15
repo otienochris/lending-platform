@@ -7,10 +7,7 @@ import ke.co.interviewusercaseworld.commons.dto.requests.DefaultRequestHeader;
 import ke.co.interviewusercaseworld.commons.dto.requests.GenericRequest;
 import ke.co.interviewusercaseworld.commons.dto.responses.DefaultResponseHeader;
 import ke.co.interviewusercaseworld.commons.dto.responses.GenericResponse;
-import ke.co.interviewusercaseworld.commons.enums.CommandsEnum;
-import ke.co.interviewusercaseworld.commons.enums.OperationNameEnum;
-import ke.co.interviewusercaseworld.commons.enums.ResponseCodes;
-import ke.co.interviewusercaseworld.commons.enums.SagaTypeEnum;
+import ke.co.interviewusercaseworld.commons.enums.*;
 import ke.co.interviewusercaseworld.msorchestrator.model.dto.request.LoanApplicationRequest;
 import ke.co.interviewusercaseworld.msorchestrator.model.dto.request.LoanRepaymentRequest;
 import ke.co.interviewusercaseworld.msorchestrator.model.dto.response.LoanApplicationAcknowledgement;
@@ -55,7 +52,7 @@ public class LoanServiceImpl implements LoanService {
         UUID loanId = UUID.randomUUID();
 
         LoanApplicationRequest loanApplicationRequest = request.getBody();
-        Boolean installmentRepayment = loanApplicationRequest.getInstallment();
+        boolean installmentRepayment = RepaymentOptionEnum.INSTALLMENT.equals(loanApplicationRequest.getRepaymentOption());
         if (installmentRepayment && loanApplicationRequest.getInstallments() == null) {
 
             return Mono.just(GenericResponse.<DefaultResponseHeader, LoanApplicationAcknowledgement>builder()

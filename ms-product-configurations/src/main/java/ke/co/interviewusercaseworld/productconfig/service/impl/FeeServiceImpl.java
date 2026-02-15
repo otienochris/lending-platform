@@ -4,14 +4,13 @@ import ke.co.interviewusercaseworld.commons.dto.requests.DefaultRequestHeader;
 import ke.co.interviewusercaseworld.commons.dto.requests.GenericRequest;
 import ke.co.interviewusercaseworld.commons.dto.responses.DefaultResponseHeader;
 import ke.co.interviewusercaseworld.commons.dto.responses.GenericResponse;
+import ke.co.interviewusercaseworld.commons.dto.responses.ProductFeeResponseDto;
 import ke.co.interviewusercaseworld.commons.entities.product.LoanProduct;
 import ke.co.interviewusercaseworld.commons.enums.LogLevelEnum;
 import ke.co.interviewusercaseworld.commons.enums.OperationNameEnum;
 import ke.co.interviewusercaseworld.commons.utils.Helpers;
 import ke.co.interviewusercaseworld.productconfig.mappers.ProductFeeMapper;
 import ke.co.interviewusercaseworld.productconfig.model.dto.request.FeeRequestDto;
-import ke.co.interviewusercaseworld.productconfig.model.dto.response.FeeResponseDto;
-import ke.co.interviewusercaseworld.productconfig.model.dto.response.LoanProductCreationResponseDto;
 import ke.co.interviewusercaseworld.productconfig.model.entity.ProductFee;
 import ke.co.interviewusercaseworld.productconfig.repository.LoanProductRepository;
 import ke.co.interviewusercaseworld.productconfig.repository.ProductFeeRepository;
@@ -37,16 +36,16 @@ public class FeeServiceImpl implements FeeService {
     private final ProductFeeRepository productFeeRepository;
     private final LoanProductService productService;
     private final ProductFeeMapper productFeeMapper;
-    private final LoanProductRepository loanProductRepository;;
+    private final LoanProductRepository loanProductRepository;
 
     @Override
-    public Mono<GenericResponse<DefaultResponseHeader, List<FeeResponseDto>>> addFees(UUID productId, GenericRequest<DefaultRequestHeader, List<FeeRequestDto>> request) {
+    public Mono<GenericResponse<DefaultResponseHeader, List<ProductFeeResponseDto>>> addFees(UUID productId, GenericRequest<DefaultRequestHeader, List<FeeRequestDto>> request) {
         return loanProductRepository.findById(productId)
                 .onErrorResume(throwable -> Mono.just(LoanProduct.builder().build()))
                 .defaultIfEmpty(LoanProduct.builder().build())
                 .flatMap(res -> {
                     if (res.getId() == null) {
-                        return Mono.just(GenericResponse.<DefaultResponseHeader, List<FeeResponseDto>>builder()
+                        return Mono.just(GenericResponse.<DefaultResponseHeader, List<ProductFeeResponseDto>>builder()
                                 .header(DefaultResponseHeader.builder()
                                         .responseCode(RC_400)
                                         .responseRefId(request.getHeader().getRequestRefId())
@@ -61,7 +60,7 @@ public class FeeServiceImpl implements FeeService {
                     }
 
                     return saveFees(request, res.getId())
-                            .flatMap(responses -> Mono.just(GenericResponse.<DefaultResponseHeader, List<FeeResponseDto>>builder()
+                            .flatMap(responses -> Mono.just(GenericResponse.<DefaultResponseHeader, List<ProductFeeResponseDto>>builder()
                                     .header(DefaultResponseHeader.builder()
                                             .responseCode(RC_200)
                                             .operation(request.getHeader().getOperation())
@@ -77,7 +76,7 @@ public class FeeServiceImpl implements FeeService {
                 });
     }
 
-    private Mono<List<FeeResponseDto>> saveFees(GenericRequest<DefaultRequestHeader, List<FeeRequestDto>> request, UUID productId) {
+    private Mono<List<ProductFeeResponseDto>> saveFees(GenericRequest<DefaultRequestHeader, List<FeeRequestDto>> request, UUID productId) {
         Helpers.log("", LogLevelEnum.info,OperationNameEnum.LOAN_PRODUCT_CONFIGURATION, "Saving fees for product: " + productId, null);
         return Flux.fromIterable(request.getBody())
                 .flatMap(feeRequestDto -> {
@@ -97,14 +96,14 @@ public class FeeServiceImpl implements FeeService {
 
 
     @Override
-    public Mono<GenericResponse<DefaultResponseHeader, List<FeeResponseDto>>> getFees(UUID productId, Map<String, String> headers) {
+    public Mono<GenericResponse<DefaultResponseHeader, List<ProductFeeResponseDto>>> getFees(UUID productId, Map<String, String> headers) {
         DefaultRequestHeader defaultRequestHeaderObject = getDefaultRequestHeaderObject(headers);
         return productFeeRepository.findByProductId(productId)
                 .collectList()
                 .defaultIfEmpty(List.of())
                 .map(productFees -> {
                     if (productFees.isEmpty()) {
-                        return GenericResponse.<DefaultResponseHeader, List<FeeResponseDto>>builder()
+                        return GenericResponse.<DefaultResponseHeader, List<ProductFeeResponseDto>>builder()
                                 .header(DefaultResponseHeader.builder()
                                         .sourceSystem(defaultRequestHeaderObject.getSourceSystem())
                                         .correlationId(defaultRequestHeaderObject.getCorrelationId())
@@ -117,7 +116,7 @@ public class FeeServiceImpl implements FeeService {
                                 .build();
                     }
 
-                    return GenericResponse.<DefaultResponseHeader, List<FeeResponseDto>>builder()
+                    return GenericResponse.<DefaultResponseHeader, List<ProductFeeResponseDto>>builder()
                             .header(DefaultResponseHeader.builder()
                                     .sourceSystem(defaultRequestHeaderObject.getSourceSystem())
                                     .correlationId(defaultRequestHeaderObject.getCorrelationId())

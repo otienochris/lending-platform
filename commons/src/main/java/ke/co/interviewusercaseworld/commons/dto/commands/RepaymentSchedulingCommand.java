@@ -1,7 +1,8 @@
 package ke.co.interviewusercaseworld.commons.dto.commands;
 
 import ke.co.interviewusercaseworld.commons.enums.InterestRateTypeEnum;
-import ke.co.interviewusercaseworld.commons.enums.TenureOptionsTypeEnum;
+import ke.co.interviewusercaseworld.commons.enums.RepaymentOptionEnum;
+import ke.co.interviewusercaseworld.commons.enums.TenureUnitEnum;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -21,9 +22,12 @@ public class RepaymentSchedulingCommand {
     private UUID productId;
     private BigDecimal principal;
     private BigDecimal interestRate;
-    private InterestRateTypeEnum interestRateType;
+    @Builder.Default
+    private InterestRateTypeEnum interestRateType = InterestRateTypeEnum.FlatRate;
     private Integer tenure;
-    private TenureOptionsTypeEnum tenureType;
-    private Boolean isInstallment;
+    @Builder.Default
+    private TenureUnitEnum tenureType = TenureUnitEnum.MONTHS;
+    @Builder.Default
+    private RepaymentOptionEnum repaymentOption = RepaymentOptionEnum.BULLET;
 
 }

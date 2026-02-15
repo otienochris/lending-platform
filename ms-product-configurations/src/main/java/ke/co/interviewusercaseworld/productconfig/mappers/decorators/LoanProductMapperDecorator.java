@@ -1,15 +1,13 @@
 package ke.co.interviewusercaseworld.productconfig.mappers.decorators;
 
+import ke.co.interviewusercaseworld.commons.dto.responses.LoanProductResponseDto;
 import ke.co.interviewusercaseworld.commons.entities.product.LoanProduct;
 import ke.co.interviewusercaseworld.productconfig.mappers.LoanProductMapper;
 import ke.co.interviewusercaseworld.productconfig.model.dto.request.LoanProductCreationRequest;
-import ke.co.interviewusercaseworld.productconfig.model.dto.response.LoanProductCreationResponseDto;
-import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 
 import java.util.Arrays;
-import java.util.List;
 
 
 public class LoanProductMapperDecorator implements LoanProductMapper {
@@ -26,8 +24,8 @@ public class LoanProductMapperDecorator implements LoanProductMapper {
     }
 
     @Override
-    public LoanProductCreationResponseDto toDto(LoanProduct loanProduct) {
-        LoanProductCreationResponseDto dto = loanProductMapper.toDto(loanProduct);
+    public LoanProductResponseDto toDto(LoanProduct loanProduct) {
+        LoanProductResponseDto dto = loanProductMapper.toDto(loanProduct);
         String tenureOptions = loanProduct.getTenureOptions();
         if (tenureOptions != null){
             dto.setTenureOptions(Arrays.stream(tenureOptions.split(",")).toList().stream().map(Integer::valueOf).toList());
