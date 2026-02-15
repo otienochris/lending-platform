@@ -2,6 +2,7 @@ package ke.co.interviewusercaseworld.repayment.services.impl;
 
 import ke.co.interviewusercaseworld.commons.enums.InstallmenFrequencyEnum;
 import ke.co.interviewusercaseworld.commons.enums.InterestRateTypeEnum;
+import ke.co.interviewusercaseworld.commons.enums.RepaymentOptionEnum;
 import ke.co.interviewusercaseworld.commons.enums.TenureUnitEnum;
 import ke.co.interviewusercaseworld.repayment.model.dto.requests.LoanRepaymentSchedulingDto;
 import ke.co.interviewusercaseworld.repayment.model.dto.response.RepaymentScheduleResponseDto;
@@ -51,7 +52,7 @@ class LoanRepaymentScheduleServiceTest {
                 .tenureUnit(TenureUnitEnum.MONTHS)
                 .loanId(uuid)
                 .interestRateType(InterestRateTypeEnum.FlatRate)
-                .repaymentOption(true)
+                .repaymentOption(RepaymentOptionEnum.INSTALLMENT)
                 .installmentFrequency(InstallmenFrequencyEnum.MONTHLY)
                 .productId(uuid)
                 .customerId(uuid)

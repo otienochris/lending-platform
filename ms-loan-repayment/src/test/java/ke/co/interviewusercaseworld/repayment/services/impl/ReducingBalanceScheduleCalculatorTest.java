@@ -2,6 +2,7 @@ package ke.co.interviewusercaseworld.repayment.services.impl;
 
 import ke.co.interviewusercaseworld.commons.enums.InstallmenFrequencyEnum;
 import ke.co.interviewusercaseworld.commons.enums.InterestRateTypeEnum;
+import ke.co.interviewusercaseworld.commons.enums.RepaymentOptionEnum;
 import ke.co.interviewusercaseworld.commons.enums.TenureUnitEnum;
 import ke.co.interviewusercaseworld.repayment.model.dto.requests.LoanRepaymentSchedulingDto;
 import org.junit.jupiter.api.BeforeEach;
@@ -34,7 +35,7 @@ class ReducingBalanceScheduleCalculatorTest {
                 .tenure(3)
                 .interestRateType(InterestRateTypeEnum.ReducingBalance)
                 .disbursementDate(LocalDateTime.now())
-                .repaymentOption(true)
+                .repaymentOption(RepaymentOptionEnum.INSTALLMENT)
                 .loanId(UUID.randomUUID())
                 .productId(UUID.randomUUID())
                 .customerId(UUID.randomUUID())
@@ -70,7 +71,7 @@ class ReducingBalanceScheduleCalculatorTest {
 
     @Test
     void testReducingBalanceScheduleCalculator_noInstallment() {
-        monthlyInstallmentSchedulingDto.setRepaymentOption(false);
+        monthlyInstallmentSchedulingDto.setRepaymentOption(RepaymentOptionEnum.BULLET);
         final String emi = "501.25";
         final int[] count = {0};
         StepVerifier.create(calculator.apply(monthlyInstallmentSchedulingDto))
