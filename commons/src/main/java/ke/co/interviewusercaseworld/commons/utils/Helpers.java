@@ -185,6 +185,8 @@ public class Helpers {
             int installments
     ) {
 
+        System.out.println("principal: " + principal + "; rate per period: " + ratePerPeriod + " installments: " + installments);
+
         BigDecimal onePlusRPowerN =
                 ratePerPeriod.add(BigDecimal.ONE).pow(installments, MC);
 

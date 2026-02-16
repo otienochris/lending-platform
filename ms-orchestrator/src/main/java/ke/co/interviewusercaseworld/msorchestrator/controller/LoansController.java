@@ -10,10 +10,14 @@ import ke.co.interviewusercaseworld.msorchestrator.model.dto.request.LoanApplica
 import ke.co.interviewusercaseworld.msorchestrator.model.dto.request.LoanRepaymentRequest;
 import ke.co.interviewusercaseworld.msorchestrator.model.dto.response.LoanApplicationAcknowledgement;
 import ke.co.interviewusercaseworld.msorchestrator.model.dto.response.LoanRepaymentRequestAck;
+import ke.co.interviewusercaseworld.msorchestrator.repository.CommandDeduplicationRepo;
 import ke.co.interviewusercaseworld.msorchestrator.service.LoanService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 import reactor.core.publisher.Mono;
 
 @RestController
@@ -22,6 +26,7 @@ import reactor.core.publisher.Mono;
 public class LoansController {
 
     private final LoanService loanService;
+    private final CommandDeduplicationRepo commandDeduplicationRepo;
 
     @PostMapping("/repayment")
     public Mono<ResponseEntity<GenericResponse<DefaultResponseHeader, LoanRepaymentRequestAck>>> repay(
@@ -50,7 +55,6 @@ public class LoansController {
     @PostMapping
     public Mono<ResponseEntity<GenericResponse<DefaultResponseHeader, LoanApplicationAcknowledgement>>> apply(
             @RequestBody GenericRequest<DefaultRequestHeader, LoanApplicationRequest> request) {
-
 
 
         return loanService.apply(request)

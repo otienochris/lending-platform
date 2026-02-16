@@ -1,5 +1,6 @@
 package ke.co.interviewusercaseworld.msorchestrator.model.dto.request;
 
+import ke.co.interviewusercaseworld.commons.enums.InstallmenFrequencyEnum;
 import ke.co.interviewusercaseworld.commons.enums.RepaymentOptionEnum;
 import ke.co.interviewusercaseworld.commons.enums.WalletTypeEnum;
 import lombok.AllArgsConstructor;
@@ -27,4 +28,5 @@ public class LoanApplicationRequest {
     private String walletId;
     @Builder.Default
     private RepaymentOptionEnum repaymentOption = RepaymentOptionEnum.BULLET;
+    private InstallmenFrequencyEnum installmentFrequency;
 }

@@ -145,6 +145,7 @@ app:
 
 jobrunr:
   background-job-server:
+    poll-interval-in-seconds: 5
     enabled: true
   dashboard:
     port: 8089
@@ -157,6 +158,7 @@ jobrunr:
     default-number-of-retries: 3
   job-scheduler:
     enabled: true
+
 
 
 

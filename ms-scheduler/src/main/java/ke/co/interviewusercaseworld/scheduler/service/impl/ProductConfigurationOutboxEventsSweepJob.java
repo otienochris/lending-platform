@@ -10,7 +10,6 @@ import ke.co.interviewusercaseworld.scheduler.repository.ProductConfigurationOut
 import ke.co.interviewusercaseworld.scheduler.service.SweepJob;
 import lombok.RequiredArgsConstructor;
 import org.jobrunr.jobs.annotations.Job;
-import org.jobrunr.scheduling.cron.Cron;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
@@ -29,7 +28,8 @@ public class ProductConfigurationOutboxEventsSweepJob implements SweepJob {
 
     @Override
     public String getCron() {
-        return Cron.every15seconds();
+//        return Cron.every15seconds();
+        return "*/7 * * * * *"; //TODO: externalize
     }
 
     @Override

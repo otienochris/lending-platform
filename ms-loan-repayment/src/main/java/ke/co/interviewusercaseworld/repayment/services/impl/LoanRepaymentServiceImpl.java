@@ -31,10 +31,8 @@ import reactor.core.publisher.Mono;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static ke.co.interviewusercaseworld.commons.utils.Helpers.convertFirstCharToLowerCase;
 
@@ -54,7 +52,9 @@ public class LoanRepaymentServiceImpl implements LoanRepaymentService {
 
     private static BigDecimal getAmountToBePaid(RepaymentCommand repaymentCommand, RepaymentSchedule repaymentSchedule) {
         BigDecimal amount = repaymentCommand.getAmount();
+
         if (amount.compareTo(repaymentSchedule.getEmiAmount()) > 0) {
+            Helpers.log("", LogLevelEnum.info, OperationNameEnum.LOAN_REPAYMENT, "Using emi amount cause amount to be paid is large: " + amount + " : " + repaymentSchedule.getEmiAmount(), null);
             amount = repaymentSchedule.getEmiAmount(); // do not overpay
         }
         return amount;
@@ -100,8 +100,8 @@ public class LoanRepaymentServiceImpl implements LoanRepaymentService {
                                         })
                                         .collectList()
                                         .flatMap(repaymentSchedules -> {
-                                            BigDecimal outstandingAmount = repaymentSchedules.stream().map(RepaymentSchedule::getInterestComponent).reduce(BigDecimal.ZERO, BigDecimal::add);
-                                            loan.setOutstandingAmount(principal.add(outstandingAmount)); // set total outstanding balance
+                                            BigDecimal outstandingAmount = repaymentSchedules.stream().map(RepaymentSchedule::getEmiAmount).reduce(BigDecimal.ZERO, BigDecimal::add);
+                                            loan.setOutstandingAmount(outstandingAmount); // set total outstanding balance
                                             return loanRepository.save(loan);
                                         })
                                         .doOnError(throwable -> Helpers.log("", LogLevelEnum.error, OperationNameEnum.REPAYMENT_SCHEDULING, "", new RuntimeException(throwable))))
@@ -230,14 +230,30 @@ public class LoanRepaymentServiceImpl implements LoanRepaymentService {
                                                     .scheduleId(repaymentSchedule.getScheduleId())
                                                     .status(isSuccessful ? "SUCCESSFUL" : "FAILED")
                                                     .build();
+
+                                            BigDecimal totalDue = loan.getOutstandingAmount().subtract(amount);
+                                            loan.setOutstandingAmount(totalDue);
+                                            loan.setStatus(totalDue.compareTo(BigDecimal.ZERO) <= 0 ? LoanStatusEnum.CLOSED.name() : loan.getStatus());
+
+                                            BigDecimal emiAmount = repaymentSchedule.getEmiAmount();
+                                            BigDecimal outstandingEmi = emiAmount.subtract(amount);
+                                            System.out.println("EMI change: " + emiAmount.toPlainString() + "->" + outstandingEmi.toPlainString());
+                                            repaymentSchedule.setEmiAmount(outstandingEmi);
+                                            repaymentSchedule.setStatus(repaymentSchedule.getEmiAmount().compareTo(BigDecimal.ZERO) <= 0 ? LoanStatusEnum.CLOSED.name() : repaymentSchedule.getStatus());
+                                            repaymentSchedule.setTotalPaid(repaymentSchedule.getTotalPaid().add(amount));
+
+                                            Helpers.log("", LogLevelEnum.info, OperationNameEnum.LOAN_REPAYMENT, "Saving repayment", null);
+                                            System.out.println(loan);
+                                            System.out.println(repaymentSchedule);
                                             return repaymentsRepository.save(repayment)
                                                     .flatMap(savedRepayment -> {
-                                                        return updateScheduleTotalPaidAndStatus(isSuccessful, repaymentSchedule, amount)
+                                                        return saveLoanAndScheduleUpdates(isSuccessful, repaymentSchedule, loan)
                                                                 .flatMap(savedRepaymentSchedule -> {
-                                                                    return updateLoanStatusIfAllSchedulesAreClosed(loan);
+                                                                    return updateLoanStatusIfAllSchedulesAreClosedV2(loan, savedRepaymentSchedule);
                                                                 });
                                                     }).flatMap(isUpdated -> {
                                                         String customerMessage = isSuccessful ? "Repayment successful" : "Repayment failed";
+                                                        Helpers.log("", LogLevelEnum.info, OperationNameEnum.LOAN_REPAYMENT, customerMessage, null);
                                                         ResponseCodes responseCode = isSuccessful ? ResponseCodes.RC_200 : ResponseCodes.RC_400;
                                                         GenericResponse<DefaultResponseHeader, LoanValidationOrRepaymentResponseDto> response = GenericResponse.<DefaultResponseHeader, LoanValidationOrRepaymentResponseDto>builder()
                                                                 .header(DefaultResponseHeader.builder()
@@ -260,26 +276,100 @@ public class LoanRepaymentServiceImpl implements LoanRepaymentService {
                 });
     }
 
-    private @NonNull Mono<RepaymentSchedule> updateScheduleTotalPaidAndStatus(Boolean isPaymentSuccessful, RepaymentSchedule repaymentSchedule, BigDecimal amount) {
+    private @NonNull Mono<RepaymentSchedule> saveLoanAndScheduleUpdates(Boolean isPaymentSuccessful,
+                                                                        RepaymentSchedule repaymentSchedule, Loan loan) {
+
         if (!isPaymentSuccessful) {
+            Helpers.log("", LogLevelEnum.warn, OperationNameEnum.LOAN_REPAYMENT, "Payment failed. loan and schedule are not being update", null);
             return Mono.just(repaymentSchedule);
         }
-        repaymentSchedule.setTotalPaid(repaymentSchedule.getTotalPaid().add(amount));
-        repaymentSchedule.setStatus(repaymentSchedule.getTotalPaid().compareTo(repaymentSchedule.getEmiAmount()) >= 0 ? LoanStatusEnum.CLOSED.name() : LoanStatusEnum.OPEN.name());
-        return repaymentScheduleRepository.save(repaymentSchedule);
+        return loanRepository.save(loan)
+                .flatMap(updatedLoan -> repaymentScheduleRepository.save(repaymentSchedule));
+
     }
 
-    private @NonNull Mono<Boolean> updateLoanStatusIfAllSchedulesAreClosed(Loan loan) {
+
+    private @NonNull Mono<Boolean> updateLoanStatusIfAllSchedulesAreClosedV2(Loan loan, RepaymentSchedule savedRepaymentSchedule) {
+
+        if (LoanStatusEnum.CLOSED.name().equalsIgnoreCase(loan.getStatus())) { // if loan status is closed, close all schedules
+            Helpers.log("", LogLevelEnum.info, OperationNameEnum.LOAN_REPAYMENT, "Updating loan schedule status to CLOSED cause the loan status is closed", null);
+            return repaymentScheduleRepository.findAllByLoanId(loan.getLoanId())
+                    .flatMap(repaymentSchedule -> {
+                        repaymentSchedule.setStatus(LoanStatusEnum.CLOSED.name());
+                        return Mono.just(repaymentScheduleRepository.save(repaymentSchedule));
+                    }).then(Mono.defer(() -> Mono.just(true)));
+        } else if (!LoanStatusEnum.CLOSED.name().equalsIgnoreCase(savedRepaymentSchedule.getStatus())) {
+            Helpers.log("", LogLevelEnum.info, OperationNameEnum.LOAN_REPAYMENT, "Installment still ongoing: " + savedRepaymentSchedule.getScheduleId(), null);
+            return repaymentScheduleRepository.save(savedRepaymentSchedule)
+                    .thenReturn(true);
+        } else {
+            return repaymentScheduleRepository.findAllByLoanIdAndStatusNotIn(loan.getId(), List.of(LoanStatusEnum.CLOSED.name()))
+                    .collectList()
+                    .defaultIfEmpty(List.of())
+                    .flatMap(repaymentSchedules -> {
+                        if (repaymentSchedules.isEmpty()) {
+                            Helpers.log("", LogLevelEnum.info, OperationNameEnum.LOAN_REPAYMENT, "All schedules are closed", null);
+                            return Mono.defer(() -> Mono.just(true));
+                        }
+
+
+                        List<RepaymentSchedule> notClosedRepaymentSchedules = repaymentSchedules.stream()
+                                .filter(it -> {
+                                    boolean isPendingSchedule = LoanStatusEnum.PENDING.name().equalsIgnoreCase(it.getStatus());
+                                    // System.out.println("Comparing: ! (PENDING=" + it.getStatus() + ")? " + isPendingSchedule);
+                                    return isPendingSchedule;
+                                })
+                                .sorted(Comparator.comparing(RepaymentSchedule::getInstallmentNumber))
+                                .toList();
+
+                        Helpers.log("", LogLevelEnum.info, OperationNameEnum.LOAN_REPAYMENT, "Some " + notClosedRepaymentSchedules.size() + " schedules are PENDING. Getting next schedule", null);
+
+                        AtomicReference<RepaymentSchedule> nextSchedule = new AtomicReference<>();
+                        notClosedRepaymentSchedules.stream().findFirst().ifPresentOrElse(nextSchedule::set, () -> Helpers.log("", LogLevelEnum.warn, OperationNameEnum.LOAN_REPAYMENT, "did not find pending schedule", null));
+
+                        RepaymentSchedule repaymentSchedule = nextSchedule.get();
+                        if (repaymentSchedule != null) {
+                            Helpers.log("", LogLevelEnum.info, OperationNameEnum.LOAN_REPAYMENT, "Found next schedule: " + repaymentSchedule.getScheduleId(), null);
+                            repaymentSchedule.setStatus(LoanStatusEnum.OPEN.name());
+                            return repaymentScheduleRepository.save(repaymentSchedule)
+                                    .thenReturn(true);
+                        } else {
+                            return Mono.defer(() -> Mono.just(false));
+                        }
+                    });
+        }
+    }
+
+    private @NonNull Mono<Boolean> updateLoanStatusIfAllSchedulesAreClosed(Loan loan, RepaymentSchedule savedRepaymentSchedule) {
+        if (!LoanStatusEnum.CLOSED.name().equalsIgnoreCase(savedRepaymentSchedule.getStatus())) {
+            Helpers.log("", LogLevelEnum.info, OperationNameEnum.LOAN_REPAYMENT, "Installment still ongoing: " + savedRepaymentSchedule.getScheduleId(), null);
+            return Mono.just(true);
+        }
         return repaymentScheduleRepository.findAllByLoanId(loan.getLoanId())
                 .collectList()
                 .flatMap(repaymentSchedules -> {
-                    long count = repaymentSchedules.stream().filter(it -> LoanStatusEnum.OPEN.name().equalsIgnoreCase(it.getStatus())).count();
-                    if (count == 0) {
-                        loan.setStatus(LoanStatusEnum.CLOSED.name());
+
+                    List<RepaymentSchedule> notClosedRepaymentSchedules = repaymentSchedules.stream().filter(it -> !LoanStatusEnum.CLOSED.name().equalsIgnoreCase(it.getStatus()))
+                            .sorted(Comparator.comparing(RepaymentSchedule::getInstallmentNumber))
+                            .toList();
+
+                    long count = notClosedRepaymentSchedules.size();
+                    if (count == 0) { //if there are no non-closed schedules eg. PENDING,
+                        Helpers.log("", LogLevelEnum.info, OperationNameEnum.LOAN_REPAYMENT, "All schedules are closed. Update loan status to closed", null);
+                        loan.setStatus(LoanStatusEnum.CLOSED.name()); // close the loan
                         return loanRepository.save(loan)
                                 .flatMap(savedLoan -> Mono.just(true));
                     } else {
-                        return Mono.just(true);
+
+                        Helpers.log("", LogLevelEnum.info, OperationNameEnum.LOAN_REPAYMENT, "Some " + notClosedRepaymentSchedules.size() + " schedules are not closed. Getting next schedule", null);
+
+                        AtomicReference<RepaymentSchedule> nextSchedule = new AtomicReference<>();
+                        notClosedRepaymentSchedules.stream().findFirst().ifPresent(nextSchedule::set);
+
+                        RepaymentSchedule repaymentSchedule = nextSchedule.get();
+                        repaymentSchedule.setStatus(LoanStatusEnum.OPEN.name());
+                        return repaymentScheduleRepository.save(repaymentSchedule)
+                                .thenReturn(true);
                     }
                 });
     }

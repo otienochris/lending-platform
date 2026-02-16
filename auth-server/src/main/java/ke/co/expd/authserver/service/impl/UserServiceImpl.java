@@ -207,6 +207,10 @@ public class UserServiceImpl implements UserService, ReactiveUserDetailsService 
                                                                 .customerMessage("User created successfully")
                                                                 .debugMessage("User created successfully")
                                                                 .build());
+                                                        response.setBody(UserResponseDto.builder()
+                                                                .id(user.getId())
+                                                                .username(user.getUsername())
+                                                                .build());
                                                     } else {
                                                         response.setHeader(DefaultResponseHeader.builder()
                                                                 .sourceSystem(request.getHeader().getSourceSystem())

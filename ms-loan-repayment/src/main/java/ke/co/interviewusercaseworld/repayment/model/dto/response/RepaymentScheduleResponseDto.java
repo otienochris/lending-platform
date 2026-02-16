@@ -23,4 +23,5 @@ public class RepaymentScheduleResponseDto {
     private BigDecimal interestComponent;
     private BigDecimal remainingBalance;
     private String status;
+    private BigDecimal totalPaid;
 }

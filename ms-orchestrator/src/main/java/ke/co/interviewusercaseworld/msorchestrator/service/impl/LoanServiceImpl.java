@@ -12,6 +12,7 @@ import ke.co.interviewusercaseworld.msorchestrator.model.dto.request.LoanApplica
 import ke.co.interviewusercaseworld.msorchestrator.model.dto.request.LoanRepaymentRequest;
 import ke.co.interviewusercaseworld.msorchestrator.model.dto.response.LoanApplicationAcknowledgement;
 import ke.co.interviewusercaseworld.msorchestrator.model.dto.response.LoanRepaymentRequestAck;
+import ke.co.interviewusercaseworld.msorchestrator.model.entities.CommandDeDuplication;
 import ke.co.interviewusercaseworld.msorchestrator.model.entities.OutBoxEvent;
 import ke.co.interviewusercaseworld.msorchestrator.model.entities.Saga;
 import ke.co.interviewusercaseworld.msorchestrator.model.entities.SagaStep;
@@ -48,74 +49,100 @@ public class LoanServiceImpl implements LoanService {
     public Mono<GenericResponse<DefaultResponseHeader, LoanApplicationAcknowledgement>> apply(GenericRequest<DefaultRequestHeader, LoanApplicationRequest> request) {
 
         // create saga
-        UUID sagaId = getSagaId(request.getHeader().getCorrelationId());
-        UUID loanId = UUID.randomUUID();
+        UUID loanId = getSagaId(request.getHeader().getCorrelationId());
 
-        LoanApplicationRequest loanApplicationRequest = request.getBody();
-        boolean installmentRepayment = RepaymentOptionEnum.INSTALLMENT.equals(loanApplicationRequest.getRepaymentOption());
-        if (installmentRepayment && loanApplicationRequest.getInstallments() == null) {
 
-            return Mono.just(GenericResponse.<DefaultResponseHeader, LoanApplicationAcknowledgement>builder()
-                    .header(DefaultResponseHeader.builder()
-                            .correlationId(sagaId)
-                            .responseRefId(request.getHeader().getRequestRefId())
-                            .responseCode(ResponseCodes.RC_400)
-                            .operation(OperationNameEnum.LOAN_APPLICATION)
-                            .customerMessage("Installment repayment is enabled but no installments were provided.")
-                            .debugMessage("Installment repayment is enabled but no installments were provided.")
-                            .build())
-                    .build());
-        }
+        return commandDeduplicationRepo.existsById(loanId)
+                .flatMap(exists -> {
 
-        Saga saga = Saga.builder()
-                .sagaType(SagaTypeEnum.LOAN_APPLICATION.name())
-                .businessKey(loanId.toString())
-                .status("STARTED")
-                .currentStep("PRODUCT_VALIDATION")
-                .originalRequest(serialize(request))
-                .build();
+                    if (exists) {
+                        return Mono.just(GenericResponse.<DefaultResponseHeader, LoanApplicationAcknowledgement>builder()
+                                .header(DefaultResponseHeader.builder()
+                                        .responseCode(ResponseCodes.RC_400)
+                                        .customerMessage("Correlation id already exists")
+                                        .debugMessage("CorrelationId already exists")
+                                        .sourceSystem(request.getHeader().getSourceSystem())
+                                        .operation(request.getHeader().getOperation())
+                                        .build())
+                                .build());
+                    }
 
-        SagaStep sagaStep = SagaStep.builder()
-                .stepName("PRODUCT_VALIDATION")
-                .status("REQUESTED")
-                .executedAt(LocalDateTime.now())
-                .build();
+                    LoanApplicationRequest loanApplicationRequest = request.getBody();
+                    boolean installmentRepayment = RepaymentOptionEnum.INSTALLMENT.equals(loanApplicationRequest.getRepaymentOption());
+                    InstallmenFrequencyEnum installmentFrequency = loanApplicationRequest.getInstallmentFrequency();
+                    if (installmentRepayment && (loanApplicationRequest.getInstallments() == null || installmentFrequency == null)) {
 
-        ProductValidationCommand productValidationCommand = ProductValidationCommand.builder()
-                .productId(loanApplicationRequest.getProductId())
-                .commandId(loanId)
-                .loanAmount(loanApplicationRequest.getLoanAmount())
-                .installment(installmentRepayment)
-                .build();
+                        return Mono.just(GenericResponse.<DefaultResponseHeader, LoanApplicationAcknowledgement>builder()
+                                .header(DefaultResponseHeader.builder()
+                                        .correlationId(loanId)
+                                        .responseRefId(request.getHeader().getRequestRefId())
+                                        .responseCode(ResponseCodes.RC_400)
+                                        .operation(OperationNameEnum.LOAN_APPLICATION)
+                                        .customerMessage("Installment repayment is enabled but no installments were provided or installment frequency not set.")
+                                        .debugMessage("Installment repayment is enabled but no installments were provided or installment frequency not set.")
+                                        .build())
+                                .build());
+                    }
 
-        OutBoxEvent outBoxEvent = OutBoxEvent.builder()
-                .aggregateType("LOAN")
-                .aggregateId(loanId.toString())
-                .createdAt(LocalDateTime.now())
-                .isPublished(false)
-                .payload(serialize(productValidationCommand))
-                .eventType(CommandsEnum.PRODUCT_VALIDATION_COMMAND.name())
-                .build();
+                    Saga saga = Saga.builder()
+                            .sagaType(SagaTypeEnum.LOAN_APPLICATION.name())
+                            .businessKey(loanId.toString())
+                            .status("STARTED")
+                            .currentStep("PRODUCT_VALIDATION")
+                            .originalRequest(serialize(request))
+                            .build();
 
-        return saveSagaAndStep(saga, sagaStep, outBoxEvent)
-                .collectList()
-                .flatMap(outBoxEvents -> {
-                    return Mono.just(
-                            GenericResponse.<DefaultResponseHeader, LoanApplicationAcknowledgement>builder()
-                                    .header(DefaultResponseHeader.builder()
-                                            .responseRefId(request.getHeader().getRequestRefId())
-                                            .responseCode(ResponseCodes.RC_200)
-                                            .operation(OperationNameEnum.LOAN_APPLICATION)
-                                            .customerMessage("Loan application initiated successfully.")
-                                            .debugMessage("Loan application initiated successfully.")
-                                            .correlationId(sagaId)
-                                            .build())
-                                    .body(LoanApplicationAcknowledgement.builder()
-                                            .loanReferenceId(loanId)
-                                            .build())
-                                    .build()
-                    );
+                    SagaStep sagaStep = SagaStep.builder()
+                            .stepName("PRODUCT_VALIDATION")
+                            .status("REQUESTED")
+                            .executedAt(LocalDateTime.now())
+                            .build();
+
+                    ProductValidationCommand productValidationCommand = ProductValidationCommand.builder()
+                            .productId(loanApplicationRequest.getProductId())
+                            .commandId(loanId)
+                            .loanAmount(loanApplicationRequest.getLoanAmount())
+                            .installment(installmentRepayment)
+                            .build();
+
+                    OutBoxEvent outBoxEvent = OutBoxEvent.builder()
+                            .aggregateType("LOAN")
+                            .aggregateId(loanId.toString())
+                            .createdAt(LocalDateTime.now())
+                            .isPublished(false)
+                            .payload(serialize(productValidationCommand))
+                            .eventType(CommandsEnum.PRODUCT_VALIDATION_COMMAND.name())
+                            .build();
+
+                    return saveSagaAndStep(saga, sagaStep, outBoxEvent)
+                            .collectList()
+                            .flatMap(outBoxEvents -> {
+                                return commandDeduplicationRepo.save(CommandDeDuplication.builder()
+                                                .commandId(loanId)
+                                                .processedAt(LocalDateTime.now())
+                                                .build())
+                                        .onErrorResume(throwable -> Mono.empty())
+                                        .then(Mono.defer(() -> Mono.just(
+                                                GenericResponse.<DefaultResponseHeader, LoanApplicationAcknowledgement>builder()
+                                                        .header(DefaultResponseHeader.builder()
+                                                                .responseRefId(request.getHeader().getRequestRefId())
+                                                                .responseCode(ResponseCodes.RC_200)
+                                                                .operation(OperationNameEnum.LOAN_APPLICATION)
+                                                                .customerMessage("Loan application initiated successfully.")
+                                                                .debugMessage("Loan application initiated successfully.")
+                                                                .correlationId(loanId)
+                                                                .build())
+                                                        .body(LoanApplicationAcknowledgement.builder()
+                                                                .loanReferenceId(loanId)
+                                                                .build())
+                                                        .build()
+                                        )));
+                            });
+
                 });
+
+
+
 
 
     }

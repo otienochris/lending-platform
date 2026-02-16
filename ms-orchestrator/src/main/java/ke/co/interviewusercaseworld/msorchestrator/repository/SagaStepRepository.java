@@ -10,7 +10,7 @@ import java.util.UUID;
 public interface SagaStepRepository extends ReactiveCrudRepository<SagaStep, UUID> {
     Mono<SagaStep> findBySagaId(UUID id);
 
-    Mono<SagaStep> findBySagaIdAndStepName(UUID id, String productValidation);
+    Flux<SagaStep> findBySagaIdAndStepName(UUID id, String productValidation);
 
     Flux<SagaStep> findAllBySagaId(UUID sagaId);
 }

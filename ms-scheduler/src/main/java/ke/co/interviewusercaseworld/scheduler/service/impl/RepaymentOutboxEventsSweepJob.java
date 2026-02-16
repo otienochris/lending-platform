@@ -10,7 +10,6 @@ import ke.co.interviewusercaseworld.scheduler.repository.RepaymentOutBoxEventRep
 import ke.co.interviewusercaseworld.scheduler.service.SweepJob;
 import lombok.RequiredArgsConstructor;
 import org.jobrunr.jobs.annotations.Job;
-import org.jobrunr.scheduling.cron.Cron;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
@@ -31,7 +30,8 @@ public class RepaymentOutboxEventsSweepJob implements SweepJob {
 
     @Override
     public String getCron() {
-        return Cron.every30seconds();
+//        return Cron.every30seconds();
+        return "*/7 * * * * *"; //TODO: externalize
     }
 
     @Override

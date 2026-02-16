@@ -22,6 +22,7 @@ import ke.co.interviewusercaseworld.msorchestrator.repository.OutBoxEventReposit
 import ke.co.interviewusercaseworld.msorchestrator.repository.SagaRepository;
 import ke.co.interviewusercaseworld.msorchestrator.repository.SagaStepRepository;
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.NonNull;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.reactive.TransactionalOperator;
@@ -71,6 +72,7 @@ public class EventListeners {
 
         return sagaRepo.findByBusinessKey(loanId)
                 .flatMap(saga -> stepRepo.findBySagaIdAndStepName(saga.getId(), PRODUCT_VALIDATION_STEP)
+                        .collectList()
                         .flatMap(sagaStep -> tx.execute(status -> {
 
                             GenericRequest<DefaultRequestHeader, LoanApplicationRequest> originalRequest;
@@ -106,9 +108,6 @@ public class EventListeners {
 
                             saga.setUpdatedAt(now());
 
-                            sagaStep.setStatus(COMPLETED_STATUS);
-                            sagaStep.setOutcome(payload);
-
 
                             OutBoxEvent outBoxEvent;
                             String nextStep;
@@ -137,12 +136,14 @@ public class EventListeners {
                                         .eventType(CommandsEnum.USER_VALIDATION_COMMAND.name())
                                         .build();
                             }
-
-                            return stepRepo.save(sagaStep)
-                                    .then(stepRepo.save(nextStep(saga)))
-                                    .then(outboxRepo.save(outBoxEvent))
-                                    .then(sagaRepo.save(saga))
-                                    .doOnError(throwable -> Helpers.log(loanId.toString(), LogLevelEnum.ERROR, OperationNameEnum.KAFKA_CONSUMER, "Error saving saga", new RuntimeException(throwable)));
+                            return updateSagaStepStatus(payload, sagaStep)
+                                    .flatMap(step -> {
+                                        return stepRepo.save(step)
+                                                .then(stepRepo.save(nextStep(saga)))
+                                                .then(outboxRepo.save(outBoxEvent))
+                                                .then(sagaRepo.save(saga))
+                                                .doOnError(throwable -> Helpers.log(loanId.toString(), LogLevelEnum.ERROR, OperationNameEnum.KAFKA_CONSUMER, "Error saving saga", new RuntimeException(throwable)));
+                                    });
                         }).then())
                 );
     }
@@ -166,6 +167,7 @@ public class EventListeners {
 
         return sagaRepo.findByBusinessKey(loanId)
                 .flatMap(saga -> stepRepo.findBySagaIdAndStepName(saga.getId(), USER_VALIDATION_STEP)
+                        .collectList()
                         .flatMap(sagaStep -> tx.execute(status -> {
 
                             GenericRequest<DefaultRequestHeader, LoanApplicationRequest> originalRequest;
@@ -208,8 +210,6 @@ public class EventListeners {
 
                             saga.setUpdatedAt(now());
 
-                            sagaStep.setStatus(COMPLETED_STATUS);
-                            sagaStep.setOutcome(payload);
 
                             OutBoxEvent outBoxEvent;
                             String nextStep;
@@ -238,10 +238,14 @@ public class EventListeners {
                             }
 
 
-                            return stepRepo.save(sagaStep)
-                                    .then(stepRepo.save(nextStep(saga)))
-                                    .then(outboxRepo.save(outBoxEvent))
-                                    .then(sagaRepo.save(saga));
+                            return updateSagaStepStatus(payload, sagaStep)
+                                    .flatMap(step -> {
+                                        return stepRepo.save(step)
+                                                .then(stepRepo.save(nextStep(saga)))
+                                                .then(outboxRepo.save(outBoxEvent))
+                                                .then(sagaRepo.save(saga));
+                                    });
+
 
                         }).then()));
 
@@ -270,6 +274,7 @@ public class EventListeners {
                             .defaultIfEmpty(ProductValidationOutcomeDto.builder().build())
                             .flatMap(loanProductResponseDto -> {
                                 return stepRepo.findBySagaIdAndStepName(saga.getId(), LOAN_DISBURSEMENT_STEP)
+                                        .collectList()
                                         .flatMap(sagaStep -> tx.execute(status -> {
 
                                             GenericRequest<DefaultRequestHeader, LoanApplicationRequest> originalRequest;
@@ -301,6 +306,7 @@ public class EventListeners {
                                                             .interestRate(loanProductResponseDto.getProductDetails().getInterestRate())
                                                             .interestRateType(loanProductResponseDto.getProductDetails().getInterestRateType())
                                                             .tenureType(loanProductResponseDto.getProductDetails().getTenureOptionsType())
+                                                            .installmentFrequency(originalRequest.getBody().getInstallmentFrequency())
                                                             .build();
 
                                                     payloadString = objectMapper.writeValueAsString(command);
@@ -314,8 +320,6 @@ public class EventListeners {
 
                                             saga.setUpdatedAt(now());
 
-                                            sagaStep.setStatus(COMPLETED_STATUS);
-                                            sagaStep.setOutcome(payload);
 
                                             OutBoxEvent outBoxEvent;
                                             String nextStep;
@@ -344,10 +348,13 @@ public class EventListeners {
 
                                             saga.setCurrentStep(nextStep);
 
-                                            return stepRepo.save(sagaStep)
-                                                    .then(stepRepo.save(nextStep(saga)))
-                                                    .then(outboxRepo.save(outBoxEvent))
-                                                    .then(sagaRepo.save(saga));
+                                            return updateSagaStepStatus(payload, sagaStep)
+                                                    .flatMap(step -> {
+                                                        return stepRepo.save(step)
+                                                                .then(stepRepo.save(nextStep(saga)))
+                                                                .then(outboxRepo.save(outBoxEvent))
+                                                                .then(sagaRepo.save(saga));
+                                                    });
 
                                         }).then());
                             });
@@ -360,13 +367,15 @@ public class EventListeners {
 
         return notSuccessful ? Mono.empty() :
                 stepRepo.findBySagaIdAndStepName(sagaId, stepName)
+                        .collectList()
                         .doOnSuccess(sagaStep -> Helpers.log(sagaId.toString(), LogLevelEnum.INFO, OperationNameEnum.KAFKA_CONSUMER, "Found step: " + stepName, null))
                         .map(it -> {
                             try {
+                                SagaStep sagaStep = it.get(0);
                                 //System.out.println("outcome: "  + it.getOutcome());
-                                ProductValidationOutcomeDto productValidationOutcomeDto = objectMapper.readValue(it.getOutcome(), ProductValidationOutcomeDto.class);
+                                ProductValidationOutcomeDto productValidationOutcomeDto = objectMapper.readValue(sagaStep.getOutcome(), ProductValidationOutcomeDto.class);
                                 if (productValidationOutcomeDto.getProductDetails() == null) {
-                                    throw new RuntimeException("Error getting product details from " + stepName + ". Product details not found in outcome: " + it.getOutcome());
+                                    throw new RuntimeException("Error getting product details from " + stepName + ". Product details not found in outcome: " + sagaStep.getOutcome());
                                 }
                                 return productValidationOutcomeDto;
                             } catch (Exception e) {
@@ -395,13 +404,12 @@ public class EventListeners {
         boolean notSuccessful = !ResponseCodes.RC_200.name().equalsIgnoreCase(finalRepaymentSchedulingEvent.getStatus());
         return sagaRepo.findByBusinessKey(loanId)
                 .flatMap(saga -> stepRepo.findBySagaIdAndStepName(saga.getId(), LOAN_REPAYMENT_SCHEDULING_STEP)
+                        .collectList()
                         .flatMap(sagaStep -> tx.execute(status -> {
 
                             saga.setCurrentStep(NOTIFY_CUSTOMER_STEP);
                             saga.setUpdatedAt(now());
 
-                            sagaStep.setStatus(COMPLETED_STATUS);
-                            sagaStep.setOutcome(payload);
 
                             String payloadString;
                             String nextStep;
@@ -450,10 +458,13 @@ public class EventListeners {
                                     .eventType(CommandsEnum.NOTIFY_COMMAND.name())
                                     .build();
 
-                            return stepRepo.save(sagaStep)
-                                    .then(stepRepo.save(nextStep(saga)))
-                                    .then(outboxRepo.save(outBoxEvent))
-                                    .then(sagaRepo.save(saga));
+                            return updateSagaStepStatus(payload, sagaStep)
+                                    .flatMap(step -> {
+                                        return stepRepo.save(step)
+                                                .then(stepRepo.save(nextStep(saga)))
+                                                .then(outboxRepo.save(outBoxEvent))
+                                                .then(sagaRepo.save(saga));
+                                    });
 
                         }).then()));
 
@@ -478,6 +489,7 @@ public class EventListeners {
         boolean notSuccessful = !ResponseCodes.RC_200.name().equalsIgnoreCase(finalRepaymentEvent.getStatus());
         return sagaRepo.findByBusinessKey(loanId)
                 .flatMap(saga -> stepRepo.findBySagaIdAndStepName(saga.getId(), LOAN_VALIDATION_STEP)
+                        .collectList()
                         .flatMap(sagaStep -> tx.execute(status -> {
 
                             GenericRequest<DefaultRequestHeader, LoanRepaymentRequest> originalRequest;
@@ -490,9 +502,6 @@ public class EventListeners {
                             }
 
                             saga.setUpdatedAt(now());
-
-                            sagaStep.setStatus(COMPLETED_STATUS);
-                            sagaStep.setOutcome(payload);
 
                             String payloadString;
                             OutBoxEvent outBoxEvent;
@@ -548,10 +557,13 @@ public class EventListeners {
 
                             saga.setCurrentStep(nextStep);
 
-                            return stepRepo.save(sagaStep)
-                                    .then(stepRepo.save(nextStep(saga)))
-                                    .then(outboxRepo.save(outBoxEvent))
-                                    .then(sagaRepo.save(saga));
+                            return updateSagaStepStatus(payload, sagaStep)
+                                    .flatMap(step -> {
+                                        return stepRepo.save(step)
+                                                .then(stepRepo.save(nextStep(saga)))
+                                                .then(outboxRepo.save(outBoxEvent))
+                                                .then(sagaRepo.save(saga));
+                                    });
 
                         }).then()));
 
@@ -576,6 +588,7 @@ public class EventListeners {
         boolean notSuccessful = !ResponseCodes.RC_200.name().equalsIgnoreCase(finalRepaymentEvent.getStatus());
         return sagaRepo.findByBusinessKey(loanId)
                 .flatMap(saga -> stepRepo.findBySagaIdAndStepName(saga.getId(), LOAN_REPAYMENT_STEP)
+                        .collectList()
                         .flatMap(sagaStep -> tx.execute(status -> {
 
                             GenericRequest<DefaultRequestHeader, LoanRepaymentRequest> originalRequest;
@@ -589,9 +602,6 @@ public class EventListeners {
 
 
                             saga.setUpdatedAt(now());
-
-                            sagaStep.setStatus(COMPLETED_STATUS);
-                            sagaStep.setOutcome(payload);
 
                             String payloadString;
                             OutBoxEvent outBoxEvent;
@@ -649,10 +659,15 @@ public class EventListeners {
 
 
                             saga.setCurrentStep(nextStep);
-                            return stepRepo.save(sagaStep)
-                                    .then(stepRepo.save(nextStep(saga)))
-                                    .then(outboxRepo.save(outBoxEvent))
-                                    .then(sagaRepo.save(saga));
+
+                            return updateSagaStepStatus(payload, sagaStep)
+                                    .flatMap(step -> {
+                                        return stepRepo.save(step)
+                                                .then(stepRepo.save(nextStep(saga)))
+                                                .then(outboxRepo.save(outBoxEvent))
+                                                .then(sagaRepo.save(saga));
+                                    });
+
 
                         }).then()));
 
@@ -674,18 +689,41 @@ public class EventListeners {
         Helpers.log(loanId.toString(), LogLevelEnum.INFO, OperationNameEnum.KAFKA_CONSUMER, "Received message from notification.event: " + payload, null);
         return sagaRepo.findByBusinessKey(loanId)
                 .flatMap(saga -> stepRepo.findBySagaIdAndStepName(saga.getId(), NOTIFY_CUSTOMER_STEP)
+                        .collectList()
                         .flatMap(sagaStep -> tx.execute(status -> {
 
                             saga.setCurrentStep("COMPLETED");
                             saga.setUpdatedAt(now());
-                            sagaStep.setStatus(COMPLETED_STATUS);
-                            sagaStep.setOutcome(payload);
 
-                            return stepRepo.save(sagaStep)
-                                    .then(sagaRepo.save(saga));
+                            return updateSagaStepStatus(payload, sagaStep)
+                                    .flatMap(step -> {
+                                        return stepRepo.save(step)
+                                                .then(sagaRepo.save(saga));
+                                    });
 
                         }).then()));
 
+    }
+
+    private @NonNull Mono<SagaStep> updateSagaStepStatus(String payload, List<SagaStep> sagaSteps) {
+        if (sagaSteps == null || sagaSteps.isEmpty()) {
+            return Mono.empty();
+        }
+
+        SagaStep first = sagaSteps.getFirst();
+
+        if (sagaSteps.size() > 1) {
+            sagaSteps.remove(first);
+
+            first.setStatus(COMPLETED_STATUS);
+            first.setOutcome(payload);
+            return stepRepo.deleteAll(sagaSteps)
+                    .thenReturn(first);
+        } else {
+            first.setStatus(COMPLETED_STATUS);
+            first.setOutcome(payload);
+            return Mono.just(first);
+        }
     }
 
     private SagaStep nextStep(Saga saga) {

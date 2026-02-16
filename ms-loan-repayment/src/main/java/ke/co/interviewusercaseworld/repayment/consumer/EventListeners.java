@@ -186,6 +186,7 @@ public class EventListeners {
                         .interestRateType(repaymentCommand.getInterestRateType())
                         .tenureUnit(repaymentCommand.getTenureType())
                         .repaymentOption(repaymentCommand.getRepaymentOption())
+                        .installmentFrequency(repaymentCommand.getInstallmentFrequency())
                         .build())
                 .build();
         return loanRepaymentService.schedule(disbursementRequest)
